@@ -70,7 +70,7 @@ These are General Feature Format files, which contain information about gene fea
 
 ### Formatter Status
 
-![Auto formate code](https://github.com/<OWNER>/<REPOSITORY>/workflows/Auto%20formate%20code/badge.svg)
+![Auto formate code](https://github.com/memetc/ML4RG_Group1/workflows/Auto%20formate%20code/badge.svg)
 
 ## ===== OLD =====
 To build the data:
