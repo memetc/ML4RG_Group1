@@ -63,7 +63,7 @@ def plot_boxplot_predictions_vs_labels(predictions, labels, ids, by_label):
     sns.boxplot(x=by_label, y='Value', hue='Type', data=df_combined, palette=['#1f77b4', '#ff7f0e'])
 
     plt.title(f"Predictions and Labels by {by_label}")
-    plt.xlabel('Species ID')
+    plt.xlabel(by_label)
     plt.ylabel('Value')
     plt.legend(title='Type')
     plt.grid(True)
