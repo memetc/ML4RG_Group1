@@ -68,6 +68,10 @@ These are FASTA files containing nucleotide sequences. Each sequence in the file
 **.gff Files**
 These are General Feature Format files, which contain information about gene features like gene locations, exons, introns, etc. Each line in a GFF file represents one feature with fields separated by tabs.
 
+### Formatter Status
+
+![Auto formate code](https://github.com/<OWNER>/<REPOSITORY>/workflows/Auto%20formate%20code/badge.svg)
+
 ## ===== OLD =====
 To build the data:
 1. Create a directory name it 'data_expression' move the expression data inside.
