@@ -246,6 +246,25 @@ def evaluate(predictions, labels):
     return mse, mae, r2
 
 def random_search(data_df, species_id, test_size, param_dist, n_iter=10):
+    """
+    Perform a random search to find the best hyperparameters for training a neural network model.
+
+    Parameters:
+    - data_df (pd.DataFrame): The DataFrame containing the dataset.
+    - species_id (int): The ID of the species to filter data by.
+    - test_size (int): The number of samples to include in the test dataset.
+    - param_dist (dict): A dictionary containing the distributions of hyperparameters to sample from.
+      It should include:
+        - 'lr': A distribution for learning rates.
+        - 'cnn_filters': A distribution for the number of CNN filters.
+        - 'batch_size': A distribution for batch sizes.
+        - 'hidden_size': A distribution for hidden layer sizes.
+        - 'activation': A list of activation functions to choose from.
+    - n_iter (int, optional): The number of iterations to perform. Default is 10.
+
+    Returns:
+    - best_config (dict): The best hyperparameter configuration found.
+    """
     best_config = None
     best_val_loss = float('inf')
 
@@ -274,4 +293,16 @@ def random_search(data_df, species_id, test_size, param_dist, n_iter=10):
 
     print(f"Best Config: {best_config}, Best Val Loss: {best_val_loss}")
     return best_config
-    
+
+
+def inverse_normalize(values):
+    """
+    Inverse normalize the values by applying the exponential function and subtracting 1.
+
+    Parameters:
+    - values (array-like): The values to be inverse normalized.
+
+    Returns:
+    - array-like: The inverse normalized values.
+    """
+    return np.exp(values) - 1
