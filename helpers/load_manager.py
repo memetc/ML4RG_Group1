@@ -5,8 +5,28 @@ from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.model_selection import train_test_split
 from .helpers import SequenceDataset
 
+
+def calculate_mean(row, stress_cols, control_cols, log_norm):
+    values = []
+    for stress_col, control_col in zip(stress_cols, control_cols):
+        stress_val = row[stress_col]
+        control_val = row[control_col]
+        
+        # Uncomment below if you want to first take lognorm then norm by crtl
+        # if log_norm:
+        #     stress_val = np.log(stress_val + 1)
+        #     control_val = np.log(control_val + 1)
+
+        # Append if the denominator is not zero and any of the values are not na
+        if pd.notna(stress_val) and pd.notna(control_val) and control_val != 0:
+            values.append(stress_val / control_val)
+    if len(values) > 0:
+        return np.mean(values)
+    else:
+        return 0
+        
 # Load the data
-def load_dataframe(data_df=None):
+def load_dataframe(data_df=None, normalize_by_ctrl=True, log_norm=True):
     """
     Load and preprocess the data for further analysis or model training.
 
@@ -19,12 +39,27 @@ def load_dataframe(data_df=None):
     if data_df is not None:
         return data_df
     data_df = pd.read_csv('combined_data.csv')
+
     # get mean of each stress condition
     averages_df = data_df.copy()
     stress_conditions = set([name.split('_')[0] for name in data_df.columns if 'TPM' in name])
+    control_condition = 'Ctrl'
+    control_columns = [name for name in data_df.columns if control_condition+'_' in name]
+    if normalize_by_ctrl:
+        stress_conditions.remove(control_condition)
+
     for stress in stress_conditions:
+        if normalize_by_ctrl:
+            if stress == control_condition:
+                continue
         stress_columns = [name for name in data_df.columns if stress+'_' in name]
-        averages_df[f'{stress}'] = np.mean([data_df[stress_columns[0]], data_df[stress_columns[1]], data_df[stress_columns[2]]], axis=0)
+        
+        if normalize_by_ctrl:
+            averages_df[f'{stress}'] = data_df.apply(calculate_mean, axis=1, stress_cols=stress_columns, control_cols=control_columns, log_norm=log_norm)
+        else:
+            averages_df[f'{stress}'] = np.mean([data_df[stress_columns[0]], 
+                                            data_df[stress_columns[1]], 
+                                            data_df[stress_columns[2]]], axis=0)
 
     # Drop the columns that are not needed
     averages_df = averages_df.drop(columns=[name for name in averages_df.columns if 'TPM' in name] + ['Chromosome','Region','Species', 'Unnamed: 0'])
@@ -59,15 +94,21 @@ def load_dataframe(data_df=None):
     # drop rows with 0 stress
     averages_df = averages_df[averages_df['Stress'] > 0]
 
-    # log values of stress conditions
-    averages_df['Stress'] = averages_df['Stress'].apply(lambda x: np.log(x+1))
+    
+    if log_norm:
+        # log values of stress conditions
+        if control_condition:
+            # We shouldn't add 1 if we already get the control ratios
+            averages_df['Stress'] = averages_df['Stress'].apply(lambda x: np.log(x))
+        else:
+            averages_df['Stress'] = averages_df['Stress'].apply(lambda x: np.log(x+1))
 
     data_df = averages_df
     return averages_df
 
 
 
-def load_data(species_id = -1, size = -1 ,val_split = 0.2 , test_split = 0.1, data_df=None):
+def load_data(species_id = -1, size = -1 ,val_split = 0.2 , test_split = 0.1, data_df=None, normalize_by_ctrl=True, log_norm=True):
     """
     Load and preprocess data, and split it into training and testing datasets.
 

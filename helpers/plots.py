@@ -198,3 +198,29 @@ def plot_hexbin_predictions_vs_labels(predictions, labels, title="Predictions vs
     plt.grid(True)
     plt.show()
 
+
+def plot_histogram(data_series, title='Histogram', xlabel='Value', ylabel='Frequency', bins=100, save=True):
+    """
+    Plots a histogram for a given Pandas Series.
+
+    Parameters:
+    - data_series: Pandas Series to plot.
+    - title: Title of the histogram.
+    - xlabel: Label for the x-axis.
+    - ylabel: Label for the y-axis.
+    - bins: Number of bins in the histogram.
+
+    Returns:
+    None
+    """
+    plt.figure(figsize=(8, 6))
+    plt.hist(data_series.dropna(), bins=bins, edgecolor='k', alpha=0.7)
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.grid(True)
+
+    if save:
+        plt.savefig(f"{title}.png")
+        
+    plt.show()
