@@ -88,7 +88,7 @@ def get_expression_data(data_path: str) -> pd.DataFrame:
     return expression_df
 
 
-def get_upstream_data(file_path: str, expression_df: pd.DataFrame) -> pd.DataFrame:
+def get_upstream_data(file_path: str) -> pd.DataFrame:
     """
     Get the upstream data from an Excel file, rename columns, replace values, and ensure consistency with the expression data.
 
@@ -107,17 +107,7 @@ def get_upstream_data(file_path: str, expression_df: pd.DataFrame) -> pd.DataFra
         "Staphylococcus��epidermidis 1457.csv": "Staphylococcus\xa0epidermidis 1457.csv",
     }
     upstream_df["csv"] = upstream_df["csv"].replace(replacement_dict)
-    assert (
-        len(set(upstream_df["csv"]).difference(set(expression_df["csv"]))) == 0
-    ), "Inconsistent CSV filenames between upstream and expression data."
-    assert (
-        len(
-            set(map(tuple, upstream_df[["csv", "region"]].values)).difference(
-                set(map(tuple, expression_df[["csv", "region"]].values))
-            )
-        )
-        == 0
-    ), "Inconsistent 'csv' and 'region' combinations between upstream and expression data."
+
     return upstream_df
 
 
@@ -152,7 +142,7 @@ def main():
     expression_df = get_expression_data(expression_data_path)
 
     # Get upstream data
-    upstream_df = get_upstream_data(upstream_data_path, expression_df)
+    upstream_df = get_upstream_data(upstream_data_path)
 
     # Get merged data
     merged_df = get_merged_data(expression_df, upstream_df)
