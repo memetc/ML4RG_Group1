@@ -3,6 +3,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import pandas as pd
 
+
 # plot the losses
 def plot_losses(train_losses, val_losses):
     """
@@ -18,15 +19,15 @@ def plot_losses(train_losses, val_losses):
     Returns:
     - None
     """
-    plt.plot(train_losses, label='Train Loss')
-    plt.plot(val_losses, label='Validation Loss')
+    plt.plot(train_losses, label="Train Loss")
+    plt.plot(val_losses, label="Validation Loss")
     plt.legend()
     plt.show()
 
     log_train_losses = np.log(train_losses)
     log_val_losses = np.log(val_losses)
-    plt.plot(log_train_losses, label='Log Train Loss')
-    plt.plot(log_val_losses, label='Log Validation Loss')
+    plt.plot(log_train_losses, label="Log Train Loss")
+    plt.plot(log_val_losses, label="Log Validation Loss")
     plt.legend()
     plt.show()
 
@@ -48,16 +49,17 @@ def plot_predictions_vs_labels(predictions, labels, title="Predictions vs Labels
     """
     plt.figure(figsize=(10, 6))
     plt.scatter(predictions, labels, alpha=0.5)
-    plt.plot([labels.min(), labels.max()], [labels.min(), labels.max()], 'r--', lw=2)
-    plt.xlabel('Predictions')
-    plt.ylabel('True Labels')
+    plt.plot([labels.min(), labels.max()], [labels.min(), labels.max()], "r--", lw=2)
+    plt.xlabel("Predictions")
+    plt.ylabel("True Labels")
     plt.title(title)
     plt.grid(True)
     plt.show()
 
 
-
-def plot_predictions_vs_labels_by_species(predictions, labels, species_ids, title="Predictions vs Labels by Species"):
+def plot_predictions_vs_labels_by_species(
+    predictions, labels, species_ids, title="Predictions vs Labels by Species"
+):
     """
     Plot scatter plots of predictions vs. true labels, grouped by species.
 
@@ -73,17 +75,23 @@ def plot_predictions_vs_labels_by_species(predictions, labels, species_ids, titl
     Returns:
     - None
     """
-    df = pd.DataFrame({'SpeciesID': species_ids, 'TrueLabel': labels, 'Prediction': predictions})
-    species_groups = df.groupby('SpeciesID')
-    
+    df = pd.DataFrame(
+        {"SpeciesID": species_ids, "TrueLabel": labels, "Prediction": predictions}
+    )
+    species_groups = df.groupby("SpeciesID")
+
     for species_id, group in species_groups:
         plt.figure(figsize=(10, 6))
-        plt.scatter(group['Prediction'], group['TrueLabel'], alpha=0.5)
-        plt.plot([group['TrueLabel'].min(), group['TrueLabel'].max()], 
-                 [group['TrueLabel'].min(), group['TrueLabel'].max()], 'r--', lw=2)
-        plt.ylabel('True Labels')
-        plt.xlabel('Predictions')
-        plt.title(f'{title} - Species ID: {species_id}')
+        plt.scatter(group["Prediction"], group["TrueLabel"], alpha=0.5)
+        plt.plot(
+            [group["TrueLabel"].min(), group["TrueLabel"].max()],
+            [group["TrueLabel"].min(), group["TrueLabel"].max()],
+            "r--",
+            lw=2,
+        )
+        plt.ylabel("True Labels")
+        plt.xlabel("Predictions")
+        plt.title(f"{title} - Species ID: {species_id}")
         plt.grid(True)
         plt.show()
 
@@ -104,31 +112,33 @@ def plot_boxplot_predictions_vs_labels(predictions, labels, ids, by_label):
     Returns:
     - None
     """
-    df_predictions = pd.DataFrame({
-        by_label: ids,
-        'Value': predictions,
-        'Type': 'Prediction'
-    })
-    df_labels = pd.DataFrame({
-        by_label: ids,
-        'Value': labels,
-        'Type': 'Label'
-    })
+    df_predictions = pd.DataFrame(
+        {by_label: ids, "Value": predictions, "Type": "Prediction"}
+    )
+    df_labels = pd.DataFrame({by_label: ids, "Value": labels, "Type": "Label"})
 
     df_combined = pd.concat([df_predictions, df_labels])
 
     plt.figure(figsize=(12, 8))
-    sns.boxplot(x=by_label, y='Value', hue='Type', data=df_combined, palette=['#1f77b4', '#ff7f0e'])
+    sns.boxplot(
+        x=by_label,
+        y="Value",
+        hue="Type",
+        data=df_combined,
+        palette=["#1f77b4", "#ff7f0e"],
+    )
 
     plt.title(f"Predictions and Labels by {by_label}")
     plt.xlabel(by_label)
-    plt.ylabel('Value')
-    plt.legend(title='Type')
+    plt.ylabel("Value")
+    plt.legend(title="Type")
     plt.grid(True)
     plt.show()
 
 
-def plot_density_predictions_vs_labels(predictions, labels, title="Predictions vs Labels"):
+def plot_density_predictions_vs_labels(
+    predictions, labels, title="Predictions vs Labels"
+):
     """
     Plot a density plot of predictions vs. true labels with inverse normalization.
 
@@ -151,19 +161,21 @@ def plot_density_predictions_vs_labels(predictions, labels, title="Predictions v
     plt.figure(figsize=(10, 6))
 
     # Use seaborn to create a density plot
-    sns.kdeplot(x=predictions, y=labels, cmap="Blues", shade=True, bw_adjust=.5)
+    sns.kdeplot(x=predictions, y=labels, cmap="Blues", shade=True, bw_adjust=0.5)
 
     # Plot the identity line (ideal predictions)
-    plt.plot([labels.min(), labels.max()], [labels.min(), labels.max()], 'r--', lw=2)
+    plt.plot([labels.min(), labels.max()], [labels.min(), labels.max()], "r--", lw=2)
 
-    plt.xlabel('Predictions')
-    plt.ylabel('True Labels')
+    plt.xlabel("Predictions")
+    plt.ylabel("True Labels")
     plt.title(title)
     plt.grid(True)
     plt.show()
 
 
-def plot_hexbin_predictions_vs_labels(predictions, labels, title="Predictions vs Labels", gridsize=10, mincnt=5):
+def plot_hexbin_predictions_vs_labels(
+    predictions, labels, title="Predictions vs Labels", gridsize=10, mincnt=5
+):
     """
     Plot a hexbin plot of predictions vs. true labels with inverse normalization.
 
@@ -183,23 +195,37 @@ def plot_hexbin_predictions_vs_labels(predictions, labels, title="Predictions vs
     plt.figure(figsize=(10, 6))
 
     # Create a hexbin plot
-    hb = plt.hexbin(predictions, labels, gridsize=gridsize, cmap='Blues', mincnt=mincnt, extent=[labels.min(), labels.max(), labels.min(), labels.max()])
+    hb = plt.hexbin(
+        predictions,
+        labels,
+        gridsize=gridsize,
+        cmap="Blues",
+        mincnt=mincnt,
+        extent=[labels.min(), labels.max(), labels.min(), labels.max()],
+    )
 
     # Add a color bar
     cb = plt.colorbar(hb)
-    cb.set_label('Counts')
+    cb.set_label("Counts")
 
     # Plot the identity line (ideal predictions)
-    plt.plot([labels.min(), labels.max()], [labels.min(), labels.max()], 'r--', lw=2)
+    plt.plot([labels.min(), labels.max()], [labels.min(), labels.max()], "r--", lw=2)
 
-    plt.xlabel('Predictions')
-    plt.ylabel('True Labels')
+    plt.xlabel("Predictions")
+    plt.ylabel("True Labels")
     plt.title(title)
     plt.grid(True)
     plt.show()
 
 
-def plot_histogram(data_series, title='Histogram', xlabel='Value', ylabel='Frequency', bins=100, save=True):
+def plot_histogram(
+    data_series,
+    title="Histogram",
+    xlabel="Value",
+    ylabel="Frequency",
+    bins=100,
+    save=True,
+):
     """
     Plots a histogram for a given Pandas Series.
 
@@ -214,7 +240,7 @@ def plot_histogram(data_series, title='Histogram', xlabel='Value', ylabel='Frequ
     None
     """
     plt.figure(figsize=(8, 6))
-    plt.hist(data_series.dropna(), bins=bins, edgecolor='k', alpha=0.7)
+    plt.hist(data_series.dropna(), bins=bins, edgecolor="k", alpha=0.7)
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
@@ -222,5 +248,5 @@ def plot_histogram(data_series, title='Histogram', xlabel='Value', ylabel='Frequ
 
     if save:
         plt.savefig(f"{title}.png")
-        
+
     plt.show()

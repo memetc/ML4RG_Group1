@@ -12,6 +12,7 @@ from models.cnn_v2 import CNNV2
 from .helpers import SequenceDataset
 from .load_manager import load_data
 
+
 class EarlyStopping:
     """
     Early stopping to stop the training when the loss does not improve after a given patience.
@@ -30,6 +31,7 @@ class EarlyStopping:
     - early_stop (bool): Flag to indicate whether training should be stopped.
     - val_loss_min (float): Minimum validation loss encountered.
     """
+
     def __init__(self, patience=5, verbose=False, delta=0):
         self.patience = patience
         self.verbose = verbose
@@ -58,7 +60,7 @@ class EarlyStopping:
         elif score < self.best_score + self.delta:
             self.counter += 1
             if self.verbose:
-                print(f'EarlyStopping counter: {self.counter} out of {self.patience}')
+                print(f"EarlyStopping counter: {self.counter} out of {self.patience}")
             if self.counter >= self.patience:
                 self.early_stop = True
         else:
@@ -67,18 +69,21 @@ class EarlyStopping:
             self.counter = 0
 
     def save_checkpoint(self, val_loss, model):
-        '''Saves model when validation loss decreases.'''
+        """Saves model when validation loss decreases."""
         if self.verbose:
-            print(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
+            print(
+                f"Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ..."
+            )
         self.val_loss_min = val_loss
-        torch.save(model.state_dict(), 'last_checkpoint.pt')
-        
+        torch.save(model.state_dict(), "last_checkpoint.pt")
+
+
 def train(config):
     """
     Train a neural network model based on the provided configuration.
 
     Parameters:
-    - config (dict): A dictionary containing the configuration parameters for training. 
+    - config (dict): A dictionary containing the configuration parameters for training.
       It should include the following keys:
         - 'model_version' (int): Version of the model to use (0 for SimpleCNN, 1 for CNNV2).
         - 'lr' (float): Learning rate for the optimizer.
@@ -96,11 +101,11 @@ def train(config):
     """
 
     # Initializes the model based on the specified version in the config.
-    if config['model_version'] == 1:
-        print('Started training CNNV2')
+    if config["model_version"] == 1:
+        print("Started training CNNV2")
         net = CNNV2(**config)
-    elif config['model_version'] == 0:
-        print('Started training SimpleCNN')
+    elif config["model_version"] == 0:
+        print("Started training SimpleCNN")
         net = SimpleCNN(**config)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -108,24 +113,34 @@ def train(config):
 
     # Sets up the device, loss criterion, optimizer, learning rate scheduler, and early stopping.
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(net.parameters(), lr=config['lr'], weight_decay=1e-5)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3, factor=0.5)
+    optimizer = optim.Adam(net.parameters(), lr=config["lr"], weight_decay=1e-5)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, "min", patience=3, factor=0.5
+    )
     early_stopping = EarlyStopping(patience=7, verbose=True)
 
     # Loads and preprocesses the training and testing data.
-    train_dataset, test_dataset = load_data(species_id=config['species_id'], size=config['test_size'], data_df=config['data_df'])
-    print(f"Training on {len(train_dataset)} samples, testing on {len(test_dataset)} samples")
+    train_dataset, test_dataset = load_data(
+        species_id=config["species_id"],
+        size=config["test_size"],
+        data_df=config["data_df"],
+    )
+    print(
+        f"Training on {len(train_dataset)} samples, testing on {len(test_dataset)} samples"
+    )
 
     train_dataset, val_dataset = train_test_split(train_dataset, test_size=0.2)
-    
-    train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=config['batch_size'], shuffle=True)
+
+    train_loader = DataLoader(
+        train_dataset, batch_size=config["batch_size"], shuffle=True
+    )
+    val_loader = DataLoader(val_dataset, batch_size=config["batch_size"], shuffle=True)
 
     train_losses = []
     val_losses = []
 
     # Trains the model over a specified number of epochs with early stopping.
-    for epoch in range(config['epochs']):
+    for epoch in range(config["epochs"]):
         net.train()
         running_loss = 0.0
         for i, data in enumerate(train_loader, 0):
@@ -141,8 +156,8 @@ def train(config):
 
             running_loss += loss.cpu().detach().numpy()
 
-        train_losses.append(running_loss/len(train_loader))
-        
+        train_losses.append(running_loss / len(train_loader))
+
         net.eval()
         val_loss = 0.0
         val_steps = 0
@@ -156,16 +171,18 @@ def train(config):
             val_loss += loss.cpu().detach().numpy()
             val_steps += 1
 
-        val_losses.append(val_loss/val_steps)
+        val_losses.append(val_loss / val_steps)
         scheduler.step(val_loss)
 
-        print(f"Epoch {epoch}, train loss: {running_loss/len(train_loader)} validation loss: {val_loss/len(val_loader)}")
+        print(
+            f"Epoch {epoch}, train loss: {running_loss/len(train_loader)} validation loss: {val_loss/len(val_loader)}"
+        )
         early_stopping(val_loss / val_steps, net)
 
         if early_stopping.early_stop:
             print("Early stopping")
             break
-    # Returns the trained model, training losses, validation losses, and test dataset.        
+    # Returns the trained model, training losses, validation losses, and test dataset.
     return net, train_losses, val_losses, test_dataset
 
 
@@ -190,8 +207,10 @@ def predict(config, net, test_dataset):
     net.to(device)
     net.eval()
 
-    test_loader = DataLoader(test_dataset, batch_size=config['batch_size'], shuffle=False)
-    
+    test_loader = DataLoader(
+        test_dataset, batch_size=config["batch_size"], shuffle=False
+    )
+
     all_predictions = []
     all_labels = []
     all_species_ids = []
@@ -219,12 +238,12 @@ def predict(config, net, test_dataset):
     all_stress_ids = np.concatenate(all_stress_ids, axis=0)
 
     return all_predictions, all_labels, all_species_ids, all_stress_ids
-    
+
 
 def evaluate(predictions, labels):
     """
     Evaluate the model's performance using various metrics.
-    
+
     Parameters:
     - predictions (array-like): The predicted values by the model.
     - labels (array-like): The true values from the dataset.
@@ -236,14 +255,15 @@ def evaluate(predictions, labels):
     """
     # Calculate Mean Squared Error (MSE)
     mse = mean_squared_error(labels, predictions)
-    
+
     # Calculate Mean Absolute Error (MAE)
     mae = mean_absolute_error(labels, predictions)
 
     # Calculate R-squared (R²)
     r2 = r2_score(labels, predictions)
-    
+
     return mse, mae, r2
+
 
 def random_search(data_df, species_id, test_size, param_dist, n_iter=10):
     """
@@ -266,29 +286,29 @@ def random_search(data_df, species_id, test_size, param_dist, n_iter=10):
     - best_config (dict): The best hyperparameter configuration found.
     """
     best_config = None
-    best_val_loss = float('inf')
+    best_val_loss = float("inf")
 
     for i in range(n_iter):
         # Randomly sample hyperparameters
         config = {
-            'lr': param_dist['lr'].rvs(),
-            'cnn_filters': param_dist['cnn_filters'].rvs(),
-            'batch_size': param_dist['batch_size'].rvs(),
-            'hidden_size': param_dist['hidden_size'].rvs(),
-            'activation': random.choice(param_dist['activation']),
-            'epochs': 50,
-            'species_id': -1,
-            'test_size': test_size,
-            'model_version': 1,
-            'data_df': data_df
+            "lr": param_dist["lr"].rvs(),
+            "cnn_filters": param_dist["cnn_filters"].rvs(),
+            "batch_size": param_dist["batch_size"].rvs(),
+            "hidden_size": param_dist["hidden_size"].rvs(),
+            "activation": random.choice(param_dist["activation"]),
+            "epochs": 50,
+            "species_id": -1,
+            "test_size": test_size,
+            "model_version": 1,
+            "data_df": data_df,
         }
 
         net, train_losses, val_losses, test_dataset = train(config)
-        
+
         if min(val_losses) < best_val_loss:
             best_val_loss = min(val_losses)
             best_config = config
-        
+
         print(f"Val Loss: {min(val_losses)}")
 
     print(f"Best Config: {best_config}, Best Val Loss: {best_val_loss}")
