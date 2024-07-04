@@ -77,7 +77,7 @@ class EarlyStopping:
         torch.save(model.state_dict(), "last_checkpoint.pt")
 
 
-def train(config):
+def train(config, train_dataset):
     """
     Train a neural network model based on the provided configuration.
 
@@ -119,17 +119,14 @@ def train(config):
     early_stopping = EarlyStopping(patience=7, verbose=True)
 
     # Loads and preprocesses the training and testing data.
-    train_dataset, test_dataset = prepare_datasets(
-        species_id=config["species_id"],
-        size=config["test_size"],
-        data_df=config["data_df"],
-    )
-    print(
-        f"Training on {len(train_dataset)} samples, testing on {len(test_dataset)} samples"
-    )
+
+
 
     train_dataset, val_dataset = train_test_split(train_dataset, test_size=0.2)
 
+    print(
+        f"Training on {len(train_dataset)} samples, testing on {len(val_dataset)} samples"
+    )
     train_loader = DataLoader(
         train_dataset, batch_size=config["batch_size"], shuffle=True
     )
@@ -182,7 +179,7 @@ def train(config):
             print("Early stopping")
             break
     # Returns the trained model, training losses, validation losses, and test dataset.
-    return net, train_losses, val_losses, test_dataset
+    return net, train_losses, val_losses
 
 
 def predict(config, net, test_dataset):
