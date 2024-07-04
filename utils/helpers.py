@@ -66,6 +66,14 @@ species_abb_to_name = {
     "YPSTB": "Yersinia pseudotuberculosis YPIII",
 }
 
+species_name_to_abb = {v: k for k, v in species_abb_to_name.items()}
+species_name_to_abb["Borrelia burgdorferi B31"] = "BBURG"
+species_name_to_abb["Helicobacter pylori G28"] = "HPG27"
+species_name_to_abb["Staphylococcus aureus MRSA252"] = "MRSA"
+species_name_to_abb["Staphylococcus aureus MSSA476"] = "MSSA"
+species_name_to_abb["Staphylococcus epidermidis 1457"] = "SEPI"
+
+
 stress_columns = [
     'As_1 (GE) - TPM', 'As_2 (GE) - TPM', 'As_3 (GE) - TPM',
     'Bs_1 (GE) - TPM', 'Bs_2 (GE) - TPM', 'Bs_3 (GE) - TPM',
@@ -133,7 +141,7 @@ class SequenceDataset(Dataset):
 
     def __getitem__(self, idx):
         return (
-            torch.tensor(self.X.iloc[idx]["Species ID"]).float(),
-            torch.tensor(self.X.iloc[idx]["Stress_name"]).float(),
+            torch.tensor(self.X.iloc[idx]["species"]).float(),
+            torch.tensor(self.X.iloc[idx]["stress_name"]).float(),
             torch.tensor(self.X.iloc[idx]["upstream200"]).float().view(1, -1, 4),
         ), torch.tensor(self.y.iloc[idx]).float()

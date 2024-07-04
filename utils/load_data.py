@@ -2,7 +2,7 @@ import pandas as pd
 import os
 import re
 from typing import List, Dict
-from utils.helpers import species_abb_to_name, stress_columns
+from utils.helpers import species_abb_to_name, stress_columns, species_name_to_abb
 
 
 
@@ -32,7 +32,13 @@ def standardize_columns(df: pd.DataFrame) -> pd.DataFrame:
                 new_columns.append(col)
         else:
             new_columns.append(col)
+
     df.columns = new_columns
+
+    if 'Aggregatibacter actinomycetemcomitans D7S-1' in set(df['Species']):
+        df['species_id'] = "AGGA"
+    else:
+        df['species_id'] = df['Species'].map(species_name_to_abb)
     return df
 
 def clean_column_name(col_name: str) -> str:
@@ -115,7 +121,7 @@ def get_expression_data(data_path: str) -> pd.DataFrame:
     expression_df = rename_columns(expression_df)
     tpm_columns = [col for col in expression_df.columns if "tpm" in col]
     expression_df = expression_df[
-        ["species", "csv", "chromosome", "region"] + tpm_columns
+        ["species", "csv", "chromosome", "region", "species_id"] + tpm_columns
     ]
     return expression_df
 
@@ -169,7 +175,7 @@ def main():
     # Paths
     expression_data_path = f"{os.getcwd()}/data/data_expression"
     upstream_data_path = (
-        f"{os.getcwd()}/data/data_sequences_upstream/upstream_sequences.xlsx"
+        f"{os.getcwd()}/data/data_sequences_upstream/upstream_sequences.tsv"
     )
     merged_data_path = f"{os.getcwd()}/data/merged_data.csv"
 
