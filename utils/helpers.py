@@ -66,6 +66,20 @@ species_abb_to_name = {
     "YPSTB": "Yersinia pseudotuberculosis YPIII",
 }
 
+stress_columns = [
+    'As_1 (GE) - TPM', 'As_2 (GE) - TPM', 'As_3 (GE) - TPM',
+    'Bs_1 (GE) - TPM', 'Bs_2 (GE) - TPM', 'Bs_3 (GE) - TPM',
+    'Ctrl_1 (GE) - TPM', 'Ctrl_2 (GE) - TPM', 'Ctrl_3 (GE) - TPM',
+    'Li_1 (GE) - TPM', 'Li_2 (GE) - TPM', 'Li_3 (GE) - TPM',
+    'Mig_1 (GE) - TPM', 'Mig_2 (GE) - TPM', 'Mig_3 (GE) - TPM',
+    'Nd_1 (GE) - TPM', 'Nd_2 (GE) - TPM', 'Nd_3 (GE) - TPM',
+    'Ns_1 (GE) - TPM', 'Ns_2 (GE) - TPM', 'Ns_3 (GE) - TPM',
+    'Oss_1 (GE) - TPM', 'Oss_2 (GE) - TPM', 'Oss_3 (GE) - TPM',
+    'Oxs_1 (GE) - TPM', 'Oxs_2 (GE) - TPM', 'Oxs_3 (GE) - TPM',
+    'Sp_1 (GE) - TPM', 'Sp_2 (GE) - TPM', 'Sp_3 (GE) - TPM',
+    'Tm_1 (GE) - TPM', 'Tm_2 (GE) - TPM', 'Tm_3 (GE) - TPM',
+    'Vic_1 (GE) - TPM', 'Vic_2 (GE) - TPM', 'Vic_3 (GE) - TPM'
+]
 
 def get_complement(sequence):
     return "".join([dna_complement[base] for base in sequence])

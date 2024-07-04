@@ -2,7 +2,38 @@ import pandas as pd
 import os
 import re
 from typing import List, Dict
+from .helpers import species_abb_to_name, stress_columns
 
+
+
+def standardize_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Clean and format column name by replacing spaces and special characters with underscores and converting to lowercase.
+
+    Parameters:
+    df (pd.DataFrame): The DataFrame whose columns are to be renamed.
+
+    Returns:
+    df (pd.DataFrame): Renamed DataFrame.
+    """
+    # Create a mapping dictionary from stress columns
+    prefixes = list(species_abb_to_name.keys())
+    pattern = re.compile(r'(' + '|'.join(prefixes) + r')_(\w+ \(\w+\) - TPM)')
+    mapping = {f"{prefix}_{col.split()[0]}": col for col in stress_columns for prefix in prefixes}
+
+    new_columns = []
+    for col in df.columns:
+        match = pattern.match(col)
+        if match:
+            key = f"{match.group(1)}_{match.group(2).split()[0]}"
+            if key in mapping:
+                new_columns.append(mapping[key])
+            else:
+                new_columns.append(col)
+        else:
+            new_columns.append(col)
+    df.columns = new_columns
+    return df
 
 def clean_column_name(col_name: str) -> str:
     """
@@ -78,6 +109,7 @@ def get_expression_data(data_path: str) -> pd.DataFrame:
     df_list: List[pd.DataFrame] = [
         read_csv_file_with_filename(file) for file in all_files
     ]
+    df_list = [standardize_columns(df) for df in df_list]
     expression_df: pd.DataFrame = pd.concat(df_list, ignore_index=True)
     expression_df.reset_index(drop=True, inplace=True)
     expression_df = rename_columns(expression_df)
@@ -99,7 +131,10 @@ def get_upstream_data(file_path: str) -> pd.DataFrame:
     Returns:
     DataFrame: The processed upstream DataFrame.
     """
-    upstream_df: pd.DataFrame = pd.read_excel(file_path)
+    if file_path.endswith(".xlsx"):
+        upstream_df: pd.DataFrame = pd.read_excel(file_path)
+    elif file_path.endswith(".tsv"):
+        upstream_df: pd.DataFrame =  pd.read_csv(file_path, sep='\t')
     upstream_df.rename(columns={"contig": "chromosome"}, inplace=True)
     replacement_dict: Dict[str, str] = {
         "Staphylococcus��aureus MRSA252.csv": "Staphylococcus\xa0aureus MRSA252.csv",
