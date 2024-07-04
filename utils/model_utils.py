@@ -261,7 +261,7 @@ def evaluate(predictions, labels):
     return mse, mae, r2
 
 
-def random_search(data_df, species_id, test_size, param_dist, n_iter=10):
+def random_search(train_dataset, test_size, param_dist, n_iter=10):
     """
     Perform a random search to find the best hyperparameters for training a neural network model.
 
@@ -296,10 +296,9 @@ def random_search(data_df, species_id, test_size, param_dist, n_iter=10):
             "species_id": -1,
             "test_size": test_size,
             "model_version": 1,
-            "data_df": data_df,
         }
 
-        net, train_losses, val_losses, test_dataset = train(config)
+        net, train_losses, val_losses = train(config, train_dataset)
 
         if min(val_losses) < best_val_loss:
             best_val_loss = min(val_losses)
@@ -308,7 +307,7 @@ def random_search(data_df, species_id, test_size, param_dist, n_iter=10):
         print(f"Val Loss: {min(val_losses)}")
 
     print(f"Best Config: {best_config}, Best Val Loss: {best_val_loss}")
-    return best_config
+    return best_config, net
 
 
 def inverse_normalize(values):
