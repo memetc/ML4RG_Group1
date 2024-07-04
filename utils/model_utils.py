@@ -9,8 +9,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from models.simple_cnn import SimpleCNN
 from models.cnn_v2 import CNNV2
-from .helpers import SequenceDataset
-from .load_manager import load_data
+from .process_data import prepare_datasets
 
 
 class EarlyStopping:
@@ -120,7 +119,7 @@ def train(config):
     early_stopping = EarlyStopping(patience=7, verbose=True)
 
     # Loads and preprocesses the training and testing data.
-    train_dataset, test_dataset = load_data(
+    train_dataset, test_dataset = prepare_datasets(
         species_id=config["species_id"],
         size=config["test_size"],
         data_df=config["data_df"],

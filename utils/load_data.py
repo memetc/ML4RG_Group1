@@ -2,7 +2,7 @@ import pandas as pd
 import os
 import re
 from typing import List, Dict
-from .helpers import species_abb_to_name, stress_columns
+from utils.helpers import species_abb_to_name, stress_columns
 
 
 
