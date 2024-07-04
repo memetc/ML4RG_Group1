@@ -72,9 +72,20 @@ These are General Feature Format files, which contain information about gene fea
 
 ![Auto formate code](https://github.com/memetc/ML4RG_Group1/workflows/Auto%20formate%20code/badge.svg)
 
-## ===== OLD =====
-To build the data:
-1. Create a directory name it 'data_expression' move the expression data inside.
-2. Move the 'upstream_sequences.tsv' to the working directory.
-3. Run the cells in order. If the data from all of the 32 species are not extracted uncomment the cell to continue to gather data.
-4. After the expression data of 32 species gathered run to get the sequence data and merge it. (Question: Do you think inner merge makes sense here?)
+## Steps to Prepare and Analyze Data
+
+### 1. Organize Data Directory
+- Create a directory named `data`.
+- Move the folders `data_expression` and `data_sequences_upstream` into the `data` directory.
+
+### 2. Merge Data
+- Run `load_data.py` to merge the expression data with sequence data.
+- The resulting merged data is saved as `merged_data.csv` inside the `data` directory.
+
+### 3. Process Data
+- Run `process_data.py` to process the merged data.
+- The processed data is saved as `processed_data.pkl` in the `data` directory.
+
+### 4. Model Development
+- Open the `model_development` notebook located in the `notebooks` directory.
+- Train the model and review the results by following the instructions in the notebook.
