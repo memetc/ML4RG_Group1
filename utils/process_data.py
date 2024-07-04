@@ -9,11 +9,7 @@ from utils.normalizations import get_ctrl_norm, get_mean, get_log_norm
 
 def preprocess_data(df: pd.DataFrame, stress_conditions: set) -> pd.DataFrame:
     print("Preprocessing started")
-    # Drop the columns that are not needed
-    df = df.drop(
-        columns=[name for name in df.columns if "tpm" in name]
-                + ["chromosome", "region", "csv"]
-    )
+
     # drop rows with missing upstream200 sequences
     df = df.dropna(subset=["upstream200"])
     # drop rows with upstream200 sequences that contain anything but A, T, C, G
@@ -25,8 +21,14 @@ def preprocess_data(df: pd.DataFrame, stress_conditions: set) -> pd.DataFrame:
 
     mlb = MultiLabelBinarizer()
     # map each species id to a one hot encoding
-    df["species"] = df["species"].apply(lambda x: [x])
-    df["species"] = mlb.fit_transform(df["species"]).tolist()
+    df["species_id"] = df["species_id"].apply(lambda x: [x])
+    df["species"] = mlb.fit_transform(df["species_id"]).tolist()
+
+    # Drop the columns that are not needed
+    df = df.drop(
+        columns=[name for name in df.columns if "tpm" in name]
+                + ["chromosome", "region", "csv", "species_id"]
+    )
 
     # map each base to one hot encoding
     # One can refactor here to handle different letters
