@@ -73,7 +73,7 @@ def preprocess_data(df: pd.DataFrame, inplace: bool = True) -> pd.DataFrame:
 
     output_df = output_df.dropna(subset=["upstream200"])
     invalid_indices = output_df[
-        ~output_df["upstream_200"].apply(_is_valid_sequence)
+        ~output_df["upstream200"].apply(_is_valid_sequence)
     ].index.tolist()
     output_df = output_df.drop(invalid_indices)
     output_df["is_complement"] = output_df["region"].str.contains("complement")
