@@ -1,66 +1,53 @@
 import pandas as pd
 import numpy as np
 
-def calculate_mean(row, stress_cols, control_cols):
-    """
-    Calculate the mean of the ratios of stress values to control values.
+from collections import defaultdict
+from typing import DefaultDict
 
-    This function computes the mean of the ratios between stress columns and control columns for a given row.
-    It only includes ratios where both stress and control values are non-NA and the control value is not zero.
+CONTROL_CONDITION_KEY = "ctrl"
+
+
+def ctrl_normalize(df: pd.DataFrame, inplace: bool = False) -> pd.DataFrame:
+    """
+    Normalizes each <SPECIES_NAME>_<CONDITION>_<REPETITION> column by the corresponding <SPECIES_NAME>_ctrl_<REPETITION> column.
+
+    This function processes a DataFrame by dividing the TPM (transcripts per million) values of each condition column
+    by the corresponding control column for each species and repetition. The normalization is done only if both the
+    condition and control columns exist in the DataFrame.
 
     Parameters:
-    row (pd.Series): A row from a DataFrame.
-    stress_cols (list of str): List of column names representing stress conditions.
-    control_cols (list of str): List of column names representing control conditions.
+    df (pd.DataFrame): The input DataFrame containing TPM columns with names following the pattern
+                       <SPECIES_NAME>_<CONDITION>_<REPETITION>_ge_tpm.
 
     Returns:
-    float: The mean of the ratios of stress values to control values for the given row.
-           Returns 0 if no valid ratios are found.
+    pd.DataFrame: The DataFrame with normalized TPM values.
     """
-    values = []
-    for stress_col, control_col in zip(stress_cols, control_cols):
-        stress_val = row[stress_col]
-        control_val = row[control_col]
-
-        # Append if the denominator is not zero and any of the values are not na
-        if pd.notna(stress_val) and pd.notna(control_val) and control_val != 0:
-            values.append(stress_val / control_val)
-    if len(values) > 0:
-        return np.mean(values)
+    # Identify the unique species and conditions
+    if inplace:
+        output_df = df
     else:
-        return 0
+        output_df = df.copy()
 
-
-def get_ctrl_norm(data_df, stress_columns, control_columns):
-    return data_df.apply(
-        calculate_mean,
-        axis=1,
-        stress_cols=stress_columns,
-        control_cols=control_columns,
+    tpm_columns: DefaultDict[str, DefaultDict[str, str]] = defaultdict(
+        lambda: defaultdict(str)
     )
+    for col in output_df.columns:
+        if "tpm" in col:
+            species, stress, rep = col.split("_")[:3]
+            if stress != CONTROL_CONDITION_KEY:
+                tpm_columns[species][stress] = rep
 
-def get_mean(data_df, stress_columns):
-    """
-    Normalize data by control columns.
+    # Divide each <SPECIES_NAME>_<CONDITION>_<REPETITION> by the corresponding <SPECIES_NAME>_ctrl_<REPETITION>
+    for species, cond2rep in tpm_columns.items():
+        for stress, rep in cond2rep.items():
+            condition_col = f"{species}_{stress}_{rep}_ge_tpm"
+            control_col = f"{species}_{CONTROL_CONDITION_KEY}_{rep}_ge_tpm"
+            if control_col in output_df.columns and condition_col in output_df.columns:
+                output_df[condition_col] = output_df[condition_col].where(
+                    output_df[control_col] == 0,
+                    output_df[condition_col] / output_df[control_col],
+                )
+            if control_col in output_df.columns:
+                output_df.drop(columns=[control_col], inplace=True)
 
-    Parameters:
-    data_df (pd.DataFrame): DataFrame containing the data to be normalized.
-    stress_columns (list of str): List of column names representing stress conditions.
-    control_columns (list of str): List of column names representing control conditions.
-
-    Returns:
-    pd.Series: A series containing the normalized values for each row in the data frame.
-    """
-    np.mean(
-        [
-            data_df[stress_columns[0]],
-            data_df[stress_columns[1]],
-            data_df[stress_columns[2]],
-        ],
-        axis=0,
-    )
-
-
-def get_log_norm(df: pd.DataFrame, normalize_by_ctrl: bool):
-    # log values of stress conditions
-    return df["stress"].apply(lambda x: np.log(x)) if normalize_by_ctrl else df["stress"].apply(lambda x: np.log(x + 1))
+    return output_df
