@@ -49,5 +49,6 @@ def ctrl_normalize(df: pd.DataFrame, inplace: bool = False) -> pd.DataFrame:
                 )
             if control_col in output_df.columns:
                 output_df.drop(columns=[control_col], inplace=True)
-
-    return output_df
+    
+    if not inplace:
+        return output_df

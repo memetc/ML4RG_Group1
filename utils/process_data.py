@@ -3,13 +3,11 @@ import os
 import pandas as pd
 import numpy as np
 
-from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.model_selection import train_test_split
 from utils.helpers import SequenceDataset
-from utils.normalizations import ctrl_normalize, get_ctrl_norm, get_mean, get_log_norm
+from utils.normalizations import ctrl_normalize
 
 import pandas as pd
-from typing import List
 
 BASES = "ATCGRYSWKMBDHVN"
 # The valid characters including IUPAC degenerate base symbols
@@ -62,17 +60,24 @@ def onehot_encode_dna(sequence: str, max_length: int) -> np.ndarray:
     return onehot_encoded
 
 
-def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
+def preprocess_data(df: pd.DataFrame, inplace: bool = True) -> pd.DataFrame:
     print("Preprocessing started")
 
-    id_columns = ["species", "upstream200", "chromosome"]
-    tpm_columns = [col for col in df.columns if "tpm" in col]
+    if inplace:
+        output_df = df
+    else:
+        output_df = df.copy()
 
-    df = df.dropna(subset=["upstream200"])
-    invalid_indices = df[~df["upstream_200"].apply(_is_valid_sequence)].index.tolist()
-    df = df.drop(invalid_indices)
-    df["is_complement"] = df["region"].str.contains("complement")
-    df["upstream200"] = df.apply(
+    id_columns = ["species", "upstream200", "chromosome"]
+    tpm_columns = [col for col in output_df.columns if "tpm" in col]
+
+    output_df = output_df.dropna(subset=["upstream200"])
+    invalid_indices = output_df[
+        ~output_df["upstream_200"].apply(_is_valid_sequence)
+    ].index.tolist()
+    output_df = output_df.drop(invalid_indices)
+    output_df["is_complement"] = output_df["region"].str.contains("complement")
+    output_df["upstream200"] = output_df.apply(
         lambda row: (
             complement_dna(row["upstream200"])
             if row["is_complement"]
@@ -81,24 +86,25 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
         axis=1,
     )
 
-    df = df[tpm_columns + id_columns].melt(
+    output_df = output_df[tpm_columns + id_columns].melt(
         var_name="condition",
         value_name="tpm",
         id_vars=["species", "upstream200", "chromosome"],
     )
-    df.dropna(subset=["tpm"], inplace=True)
-    df["condition"] = df["condition"].str.replace("_ge_tpm", "")
-    df[["species_abbreviation", "stress_condition", "evaluation"]] = df[
+    output_df.dropna(subset=["tpm"], inplace=True)
+    output_df["condition"] = output_df["condition"].str.replace("_ge_tpm", "")
+    output_df[["species_abbreviation", "stress_condition", "evaluation"]] = output_df[
         "condition"
     ].str.rsplit("_", n=2, expand=True)
 
-    df = df[id_columns + ["stress_condition", "evaluation", "tpm"]]
+    output_df = output_df[id_columns + ["stress_condition", "evaluation", "tpm"]]
 
-    max_length = max(df["upstream200"].apply(lambda x: len(x)))
-    df["upstream200"] = df["upstream200"].apply(
+    max_length = max(output_df["upstream200"].apply(lambda x: len(x)))
+    output_df["upstream200"] = output_df["upstream200"].apply(
         lambda seq: onehot_encode_dna(seq, max_length)
     )
-    return df
+    if not inplace:
+        return output_df
 
 
 # Load the data
@@ -131,7 +137,7 @@ def get_processed_data(
     if normalize_by_ctrl:
         ctrl_normalize(df, inplace=True)
 
-    df = preprocess_data(df)
+    preprocess_data(df, inplace=True)
     id_columns = ["species", "upstream200", "chromosome"]
 
     if aggregate == "mean":
