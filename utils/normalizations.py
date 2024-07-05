@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 
 from collections import defaultdict
-from typing import DefaultDict
 
 CONTROL_CONDITION_KEY = "ctrl"
 
@@ -28,9 +27,7 @@ def ctrl_normalize(df: pd.DataFrame, inplace: bool = False) -> pd.DataFrame:
     else:
         output_df = df.copy()
 
-    tpm_columns: DefaultDict[str, DefaultDict[str, str]] = defaultdict(
-        lambda: defaultdict(str)
-    )
+    tpm_columns = defaultdict(lambda: defaultdict(str))
     for col in output_df.columns:
         if "tpm" in col:
             species, stress, rep = col.split("_")[:3]
@@ -43,12 +40,17 @@ def ctrl_normalize(df: pd.DataFrame, inplace: bool = False) -> pd.DataFrame:
             condition_col = f"{species}_{stress}_{rep}_ge_tpm"
             control_col = f"{species}_{CONTROL_CONDITION_KEY}_{rep}_ge_tpm"
             if control_col in output_df.columns and condition_col in output_df.columns:
-                output_df[condition_col] = output_df[condition_col].where(
-                    output_df[control_col] == 0,
-                    output_df[condition_col] / output_df[control_col],
+                output_df[condition_col] = np.where(
+                    output_df[control_col].isna(),
+                    output_df[condition_col],
+                    np.where(
+                        output_df[control_col] == 0,
+                        output_df[condition_col],
+                        output_df[condition_col] / output_df[control_col],
+                    ),
                 )
             if control_col in output_df.columns:
                 output_df.drop(columns=[control_col], inplace=True)
-    
+
     if not inplace:
         return output_df
