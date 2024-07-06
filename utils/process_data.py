@@ -5,6 +5,7 @@ import numpy as np
 
 from sklearn.model_selection import train_test_split
 from utils.helpers import SequenceDataset
+from utils.helpers import species_name_to_abb
 from utils.normalizations import ctrl_normalize
 
 import pandas as pd
@@ -97,7 +98,7 @@ def preprocess_data(df: pd.DataFrame, inplace: bool = True) -> pd.DataFrame:
         "condition"
     ].str.rsplit("_", n=2, expand=True)
 
-    output_df = output_df[id_columns + ["stress_condition", "evaluation", "tpm"]]
+    output_df = output_df[id_columns + ["stress_condition", "species_full_name", "evaluation", "tpm"]]
 
     if not inplace:
         return output_df
@@ -129,6 +130,10 @@ def get_processed_data(
         return
 
     df = pd.read_csv(merged_data_path)
+    
+    df['species_full_name'] = df['species']
+    df['species'] = df.species.map(species_name_to_abb)
+
 
     if normalize_by_ctrl:
         ctrl_normalize(df, inplace=True)
@@ -141,19 +146,21 @@ def get_processed_data(
     elif aggregate == "max":
         df = df.groupby(id_columns + ["stress_condition"])["tpm"].max().reset_index()
 
-    df.drop(columns=["chromosome"], inplace=True)
-
     if normalize_by_ctrl:
         df = df[df["stress_condition"] != "ctrl"]
 
     if log_transform:
         df["tpm"] = df["tpm"].apply(np.log1p)
 
+    # Encode 'species', 'upstream200' and 'stress_condition' columns as IDs
     max_length = max(df["upstream200"].apply(lambda x: len(x)))
     df["upstream200"] = df["upstream200"].apply(
         lambda seq: onehot_encode_dna(seq, max_length)
     )
-
+    df['species_id'] = pd.factorize(df['species'])[0]
+    df['stress_condition_id'] = pd.factorize(df['stress_condition'])[0]
+    df.drop(columns=["chromosome"], inplace=True)
+    
     return df
 
 
