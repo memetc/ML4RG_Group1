@@ -4,9 +4,9 @@ import pandas as pd
 import numpy as np
 
 from sklearn.model_selection import train_test_split
-from utils.helpers import SequenceDataset
-from utils.helpers import species_name_to_abb
-from utils.normalizations import ctrl_normalize
+from .helpers import SequenceDataset
+from .helpers import species_name_to_abb
+from .normalizations import ctrl_normalize
 
 import pandas as pd
 
@@ -61,24 +61,17 @@ def onehot_encode_dna(sequence: str, max_length: int) -> np.ndarray:
     return onehot_encoded
 
 
-def preprocess_data(df: pd.DataFrame, inplace: bool = True) -> pd.DataFrame:
+def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     print("Preprocessing started")
 
-    if inplace:
-        output_df = df
-    else:
-        output_df = df.copy()
-
     id_columns = ["species", "upstream200", "chromosome"]
-    tpm_columns = [col for col in output_df.columns if "tpm" in col]
+    tpm_columns = [col for col in df.columns if "tpm" in col]
 
-    output_df = output_df.dropna(subset=["upstream200"])
-    invalid_indices = output_df[
-        ~output_df["upstream200"].apply(_is_valid_sequence)
-    ].index.tolist()
-    output_df = output_df.drop(invalid_indices)
-    output_df["is_complement"] = output_df["region"].str.contains("complement")
-    output_df["upstream200"] = output_df.apply(
+    df = df.dropna(subset=["upstream200"])
+    invalid_indices = df[~df["upstream200"].apply(_is_valid_sequence)].index.tolist()
+    df = df.drop(invalid_indices)
+    df["is_complement"] = df["region"].str.contains("complement")
+    df["upstream200"] = df.apply(
         lambda row: (
             complement_dna(row["upstream200"])
             if row["is_complement"]
@@ -87,21 +80,20 @@ def preprocess_data(df: pd.DataFrame, inplace: bool = True) -> pd.DataFrame:
         axis=1,
     )
 
-    output_df = output_df[tpm_columns + id_columns].melt(
+    df = df[tpm_columns + id_columns].melt(
         var_name="condition",
         value_name="tpm",
-        id_vars=["species", "upstream200", "chromosome"],
+        id_vars=id_columns,
     )
-    output_df.dropna(subset=["tpm"], inplace=True)
-    output_df["condition"] = output_df["condition"].str.replace("_ge_tpm", "")
-    output_df[["species_abbreviation", "stress_condition", "evaluation"]] = output_df[
+    df.dropna(subset=["tpm"], inplace=True)
+    df["condition"] = df["condition"].str.replace("_ge_tpm", "")
+    df[["species_abbreviation", "stress_condition", "evaluation"]] = df[
         "condition"
     ].str.rsplit("_", n=2, expand=True)
 
-    output_df = output_df[id_columns + ["stress_condition", "species_full_name", "evaluation", "tpm"]]
+    df.drop(columns=["condition", "species_abbreviation"], inplace=True)
 
-    if not inplace:
-        return output_df
+    return df
 
 
 # Load the data
@@ -130,15 +122,14 @@ def get_processed_data(
         return
 
     df = pd.read_csv(merged_data_path)
-    
-    df['species_full_name'] = df['species']
-    df['species'] = df.species.map(species_name_to_abb)
 
+    df["species"] = df.species.map(species_name_to_abb)
 
     if normalize_by_ctrl:
-        ctrl_normalize(df, inplace=True)
+        df = ctrl_normalize(df)
 
-    preprocess_data(df, inplace=True)
+    df = preprocess_data(df)
+
     id_columns = ["species", "upstream200", "chromosome"]
 
     if aggregate == "mean":
@@ -157,10 +148,10 @@ def get_processed_data(
     df["upstream200"] = df["upstream200"].apply(
         lambda seq: onehot_encode_dna(seq, max_length)
     )
-    df['species_id'] = pd.factorize(df['species'])[0]
-    df['stress_condition_id'] = pd.factorize(df['stress_condition'])[0]
+    df["species_id"] = pd.factorize(df["species"])[0]
+    df["stress_condition_id"] = pd.factorize(df["stress_condition"])[0]
     df.drop(columns=["chromosome"], inplace=True)
-    
+
     return df
 
 

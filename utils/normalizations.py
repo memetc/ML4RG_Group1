@@ -6,7 +6,7 @@ from collections import defaultdict
 CONTROL_CONDITION_KEY = "ctrl"
 
 
-def ctrl_normalize(df: pd.DataFrame, inplace: bool = False) -> pd.DataFrame:
+def ctrl_normalize(df: pd.DataFrame) -> pd.DataFrame:
     """
     Normalizes each <SPECIES_NAME>_<CONDITION>_<REPETITION> column by the corresponding <SPECIES_NAME>_ctrl_<REPETITION> column.
 
@@ -22,13 +22,8 @@ def ctrl_normalize(df: pd.DataFrame, inplace: bool = False) -> pd.DataFrame:
     pd.DataFrame: The DataFrame with normalized TPM values.
     """
     # Identify the unique species and conditions
-    if inplace:
-        output_df = df
-    else:
-        output_df = df.copy()
-
     tpm_columns = defaultdict(lambda: defaultdict(str))
-    for col in output_df.columns:
+    for col in df.columns:
         if "tpm" in col:
             species, stress, rep = col.split("_")[:3]
             if stress != CONTROL_CONDITION_KEY:
@@ -39,18 +34,17 @@ def ctrl_normalize(df: pd.DataFrame, inplace: bool = False) -> pd.DataFrame:
         for stress, rep in cond2rep.items():
             condition_col = f"{species}_{stress}_{rep}_ge_tpm"
             control_col = f"{species}_{CONTROL_CONDITION_KEY}_{rep}_ge_tpm"
-            if control_col in output_df.columns and condition_col in output_df.columns:
-                output_df[condition_col] = np.where(
-                    output_df[control_col].isna(),
-                    output_df[condition_col],
+            if control_col in df.columns and condition_col in df.columns:
+                df[condition_col] = np.where(
+                    df[control_col].isna(),
+                    df[condition_col],
                     np.where(
-                        output_df[control_col] == 0,
-                        output_df[condition_col],
-                        output_df[condition_col] / output_df[control_col],
+                        df[control_col] == 0,
+                        df[condition_col],
+                        df[condition_col] / df[control_col],
                     ),
                 )
-            if control_col in output_df.columns:
-                output_df.drop(columns=[control_col], inplace=True)
+            if control_col in df.columns:
+                df.drop(columns=[control_col], inplace=True)
 
-    if not inplace:
-        return output_df
+    return df
