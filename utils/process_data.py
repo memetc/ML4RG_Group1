@@ -11,13 +11,31 @@ from .normalizations import ctrl_normalize
 import pandas as pd
 from typing import Optional
 
+
 BASES = "ATCGRYSWKMBDHVN"
 # The valid characters including IUPAC degenerate base symbols
 IUPAC_DEGENERATE_BASES = set(BASES)
 # The complement mappings for the DNA bases including IUPAC degenerate base symbols
 COMPLEMENT_MAP = str.maketrans(BASES, "TAGCYRSWMKVHDBN")
-# One-hot encoding mapping for the DNA bases including IUPAC degenerate base symbols
-ONE_HOT_MAP = {base: idx for idx, base in enumerate(BASES)}
+
+# Mapping IUPAC codes to their probability distributions
+PROBABILITY_MAP = {
+    "A": [1, 0, 0, 0],
+    "T": [0, 1, 0, 0],
+    "C": [0, 0, 1, 0],
+    "G": [0, 0, 0, 1],
+    "R": [0.5, 0, 0, 0.5],  # A or G
+    "Y": [0, 0.5, 0.5, 0],  # T or C
+    "S": [0, 0, 0.5, 0.5],  # C or G
+    "W": [0.5, 0.5, 0, 0],  # A or T
+    "K": [0, 0.5, 0, 0.5],  # T or G
+    "M": [0.5, 0, 0.5, 0],  # A or C
+    "B": [0, 0.333, 0.333, 0.333],  # C or G or T
+    "D": [0.333, 0.333, 0, 0.333],  # A or G or T
+    "H": [0.333, 0.333, 0.333, 0],  # A or C or T
+    "V": [0.333, 0, 0.333, 0.333],  # A or C or G
+    "N": [0.25, 0.25, 0.25, 0.25],  # Any base
+}
 
 
 def _is_valid_sequence(seq: str) -> bool:
@@ -37,29 +55,30 @@ def complement_dna(sequence: str) -> str:
     return sequence.translate(COMPLEMENT_MAP)
 
 
-def onehot_encode_dna(sequence: str, max_length: int) -> np.ndarray:
+def probabilistic_encode_dna(sequence: str, max_length: int) -> np.ndarray:
     """
-    One-hot encodes a DNA sequence, including IUPAC degenerate base symbols,
-    and pads with zeros if the sequence has fewer characters than max_length.
+    Encodes a DNA sequence as probability distributions for each base,
+    including IUPAC degenerate base symbols, and pads with zeros if the
+    sequence has fewer characters than max_length.
 
     Args:
-        sequence (str): The DNA sequence to one-hot encode.
+        sequence (str): The DNA sequence to encode.
         max_length (int): The maximum length of the sequence for padding.
 
     Returns:
-        np.ndarray: A one-hot encoded numpy array representation of the DNA sequence.
+        np.ndarray: A numpy array representation of the DNA sequence with probabilities.
     """
-    # Create a zero matrix of shape (max_length, len(BASES))
-    onehot_encoded = np.zeros((max_length, len(BASES)), dtype=int)
+    # Create a zero matrix of shape (max_length, 4) since there are 4 possible bases
+    prob_encoded = np.zeros((max_length, 4), dtype=float)
 
-    # Fill in the one-hot encoding for each base in the sequence
+    # Fill in the probability encoding for each base in the sequence
     for i, base in enumerate(sequence):
         if i >= max_length:
             break
-        if base in ONE_HOT_MAP:
-            onehot_encoded[i, ONE_HOT_MAP[base]] = 1
+        if base in PROBABILITY_MAP:
+            prob_encoded[i] = PROBABILITY_MAP[base]
 
-    return onehot_encoded
+    return prob_encoded
 
 
 def one_hot_encode_to_numpy(
@@ -189,7 +208,7 @@ def get_processed_data(
     # Encode 'species', 'upstream200' and 'stress_condition' columns as IDs
     max_length = max(df["upstream200"].apply(lambda x: len(x)))
     df["upstream200"] = df["upstream200"].apply(
-        lambda seq: onehot_encode_dna(seq, max_length)
+        lambda seq: probabilistic_encode_dna(seq, max_length)
     )
     df = one_hot_encode_to_numpy(df, "species_name", new_column_name="species")
     df = one_hot_encode_to_numpy(
@@ -236,12 +255,12 @@ def prepare_datasets(data_df, species_id=-1, size=-1, test_split=0.1):
 
 
 def main():
-    processed_data_path = f"{os.getcwd()}/data/processed_data.pkl"
+    processed_data_path = f"{os.getcwd()}/data/processed_data_finall.csv"
     processed_df = get_processed_data()
 
     # Save the merged data to a CSV file
     print(f"Data is being saved {processed_data_path}")
-    processed_df.to_pickle(processed_data_path)
+    processed_df.to_csv(processed_data_path)
     print(f"Processed data saved to {processed_data_path}")
 
 
