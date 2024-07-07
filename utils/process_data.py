@@ -9,7 +9,7 @@ from .helpers import species_name_to_abb
 from .normalizations import ctrl_normalize
 
 import pandas as pd
-from typing import Any, Optional
+from typing import Optional
 
 BASES = "ATCGRYSWKMBDHVN"
 # The valid characters including IUPAC degenerate base symbols
@@ -62,7 +62,9 @@ def onehot_encode_dna(sequence: str, max_length: int) -> np.ndarray:
     return onehot_encoded
 
 
-def one_hot_encode_to_numpy(df: pd.DataFrame, column_name: str, new_column_name: Optional[str] = None) -> pd.DataFrame:
+def one_hot_encode_to_numpy(
+    df: pd.DataFrame, column_name: str, new_column_name: Optional[str] = None
+) -> pd.DataFrame:
     """
     One-hot encodes the specified column of the DataFrame and adds the encoded vectors as numpy arrays in a new column.
 
@@ -76,17 +78,18 @@ def one_hot_encode_to_numpy(df: pd.DataFrame, column_name: str, new_column_name:
     """
     # One-hot encode the specified column
     encoded_df = pd.get_dummies(df[column_name], prefix=column_name)
-    
+
     # Convert the one-hot encoded DataFrame to a numpy array
     encoded_np = encoded_df.to_numpy(dtype=int)
-    
+
     # Assign the numpy arrays back to the DataFrame in a new column
     if new_column_name is None:
-        new_column_name = column_name + '_encoded'
-    
+        new_column_name = column_name + "_encoded"
+
     df[new_column_name] = list(encoded_np)
-    
+
     return df
+
 
 def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     print("Preprocessing started")
@@ -150,7 +153,7 @@ def get_processed_data(
 
     df = pd.read_csv(merged_data_path)
 
-    df["species_name"] = df['species'].map(species_name_to_abb)
+    df["species_name"] = df["species"].map(species_name_to_abb)
     df.drop(columns=["species"], inplace=True)
 
     if normalize_by_ctrl:
@@ -161,9 +164,17 @@ def get_processed_data(
     id_columns = ["species_name", "upstream200", "chromosome"]
 
     if aggregate == "mean":
-        df = df.groupby(id_columns + ["stress_condition_name"])["tpm"].mean().reset_index()
+        df = (
+            df.groupby(id_columns + ["stress_condition_name"])["tpm"]
+            .mean()
+            .reset_index()
+        )
     elif aggregate == "max":
-        df = df.groupby(id_columns + ["stress_condition_name"])["tpm"].max().reset_index()
+        df = (
+            df.groupby(id_columns + ["stress_condition_name"])["tpm"]
+            .max()
+            .reset_index()
+        )
 
     if normalize_by_ctrl:
         df = df[df["stress_condition_name"] != "ctrl"]
@@ -180,9 +191,11 @@ def get_processed_data(
     df["upstream200"] = df["upstream200"].apply(
         lambda seq: onehot_encode_dna(seq, max_length)
     )
-    df = one_hot_encode_to_numpy(df, "species_name", new_column_name='species')
-    df = one_hot_encode_to_numpy(df, "stress_condition_name", new_column_name='stress_condition')
-    print(df.columns)    
+    df = one_hot_encode_to_numpy(df, "species_name", new_column_name="species")
+    df = one_hot_encode_to_numpy(
+        df, "stress_condition_name", new_column_name="stress_condition"
+    )
+    print(df.columns)
     df.drop(columns=["chromosome"], inplace=True)
 
     return df
