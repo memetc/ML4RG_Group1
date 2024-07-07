@@ -1,108 +1,76 @@
+import pandas as pd
 import os
 
-import pandas as pd
-import numpy as np
-
+from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.model_selection import train_test_split
-from .helpers import SequenceDataset
-from .helpers import species_name_to_abb
-from .normalizations import ctrl_normalize
-
-import pandas as pd
-
-BASES = "ATCGRYSWKMBDHVN"
-# The valid characters including IUPAC degenerate base symbols
-IUPAC_DEGENERATE_BASES = set(BASES)
-# The complement mappings for the DNA bases including IUPAC degenerate base symbols
-COMPLEMENT_MAP = str.maketrans(BASES, "TAGCYRSWMKVHDBN")
-# One-hot encoding mapping for the DNA bases including IUPAC degenerate base symbols
-ONE_HOT_MAP = {base: idx for idx, base in enumerate(BASES)}
+from utils.helpers import SequenceDataset
+from utils.normalizations import get_ctrl_norm, get_mean, get_log_norm
 
 
-def _is_valid_sequence(seq: str) -> bool:
-    return len(seq) > 0 and set(seq).issubset(IUPAC_DEGENERATE_BASES)
-
-
-def complement_dna(sequence: str) -> str:
-    """
-    Computes the complement of a DNA sequence, including IUPAC degenerate base symbols.
-
-    Args:
-        sequence (str): The DNA sequence to complement.
-
-    Returns:
-        str: The complement of the DNA sequence.
-    """
-    return sequence.translate(COMPLEMENT_MAP)
-
-
-def onehot_encode_dna(sequence: str, max_length: int) -> np.ndarray:
-    """
-    One-hot encodes a DNA sequence, including IUPAC degenerate base symbols,
-    and pads with zeros if the sequence has fewer characters than max_length.
-
-    Args:
-        sequence (str): The DNA sequence to one-hot encode.
-        max_length (int): The maximum length of the sequence for padding.
-
-    Returns:
-        np.ndarray: A one-hot encoded numpy array representation of the DNA sequence.
-    """
-    # Create a zero matrix of shape (max_length, len(BASES))
-    onehot_encoded = np.zeros((max_length, len(BASES)), dtype=int)
-
-    # Fill in the one-hot encoding for each base in the sequence
-    for i, base in enumerate(sequence):
-        if i >= max_length:
-            break
-        if base in ONE_HOT_MAP:
-            onehot_encoded[i, ONE_HOT_MAP[base]] = 1
-
-    return onehot_encoded
-
-
-def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
+def preprocess_data(df: pd.DataFrame, stress_conditions: set) -> pd.DataFrame:
     print("Preprocessing started")
 
-    id_columns = ["species", "upstream200", "chromosome"]
-    tpm_columns = [col for col in df.columns if "tpm" in col]
-
+    # drop rows with missing upstream200 sequences
     df = df.dropna(subset=["upstream200"])
-    invalid_indices = df[~df["upstream200"].apply(_is_valid_sequence)].index.tolist()
-    df = df.drop(invalid_indices)
-    df["is_complement"] = df["region"].str.contains("complement")
-    df["upstream200"] = df.apply(
-        lambda row: (
-            complement_dna(row["upstream200"])
-            if row["is_complement"]
-            else row["upstream200"]
-        ),
-        axis=1,
+    # drop rows with upstream200 sequences that contain anything but A, T, C, G
+    df = df[
+        df["upstream200"].apply(
+            lambda x: set(x).issubset({"A", "T", "C", "G"})
+        )
+    ]
+
+    mlb = MultiLabelBinarizer()
+    # map each species id to a one hot encoding
+    df["species_id"] = df["species_id"].apply(lambda x: [x])
+    df["species"] = mlb.fit_transform(df["species_id"]).tolist()
+
+    # Drop the columns that are not needed
+    df = df.drop(
+        columns=[name for name in df.columns if "tpm" in name]
+                + ["chromosome", "region", "csv", "species_id"]
     )
 
-    df = df[tpm_columns + id_columns].melt(
-        var_name="condition",
-        value_name="tpm",
-        id_vars=id_columns,
+    # map each base to one hot encoding
+    # One can refactor here to handle different letters
+    base_encodings = {
+        "A": [1, 0, 0, 0],
+        "T": [0, 1, 0, 0],
+        "C": [0, 0, 1, 0],
+        "G": [0, 0, 0, 1],
+    }
+    longest_sequence = max(df["upstream200"].apply(lambda x: len(x)))
+    df["upstream200"] = df["upstream200"].apply(
+        lambda x: [base_encodings[base] for base in x]
+                  + [[0, 0, 0, 0]] * (longest_sequence - len(x))
     )
-    df.dropna(subset=["tpm"], inplace=True)
-    df["condition"] = df["condition"].str.replace("_ge_tpm", "")
-    df[["species_abbreviation", "stress_condition", "evaluation"]] = df[
-        "condition"
-    ].str.rsplit("_", n=2, expand=True)
 
-    df.drop(columns=["condition", "species_abbreviation"], inplace=True)
+    # explode dataset to have one row per stress condition
+    df["stress"] = df.apply(
+        lambda row: [{stress: row[stress]} for stress in stress_conditions], axis=1
+    )
+    df = df.drop(
+        columns=[name for name in df.columns if name in stress_conditions]
+    )
 
+    df = df.explode("stress")
+    df["stress_name"] = df["stress"].apply(
+        lambda x: list(x.keys())[0]
+    )
+    df["stress"] = df["stress"].apply(lambda x: list(x.values())[0])
+
+    # one hot encode stress names
+    df["stress_name"] = df["stress_name"].apply(lambda x: [x])
+    df["stress_name"] = mlb.fit_transform(df["stress_name"]).tolist()
+
+    # drop rows with 0 stress
+    df = df[df["stress"] > 0]
     return df
 
 
 # Load the data
-def get_processed_data(
-    project_root_dir: str = None,
-    normalize_by_ctrl: bool = True,
-    log_transform: bool = True,
-    aggregate: str = "mean",
-) -> pd.DataFrame:
+def get_processed_data(project_root_dir: str = None,
+                       normalize_by_ctrl: bool = True,
+                       normalize_by_log: bool = True) -> pd.DataFrame:
     """
     Load and preprocess the data for further analysis or model training.
 
@@ -112,50 +80,53 @@ def get_processed_data(
     Returns:
     - pd.DataFrame: The preprocessed DataFrame ready for analysis or model training.
     """
-
     if project_root_dir is None:
         project_root_dir = os.getcwd()
     merged_data_path = f"{project_root_dir}/data/merged_data.csv"
 
-    if not os.path.exists(merged_data_path):
+    if os.path.exists(merged_data_path):
+        data_df = pd.read_csv(merged_data_path)
+    else:
         print("The file does not exist.")
         return
-
-    df = pd.read_csv(merged_data_path)
-
-    df["species"] = df.species.map(species_name_to_abb)
-
-    if normalize_by_ctrl:
-        df = ctrl_normalize(df)
-
-    df = preprocess_data(df)
-
-    id_columns = ["species", "upstream200", "chromosome"]
-
-    if aggregate == "mean":
-        df = df.groupby(id_columns + ["stress_condition"])["tpm"].mean().reset_index()
-    elif aggregate == "max":
-        df = df.groupby(id_columns + ["stress_condition"])["tpm"].max().reset_index()
-
-    if normalize_by_ctrl:
-        df = df[df["stress_condition"] != "ctrl"]
-
-    if log_transform:
-        df["tpm"] = df["tpm"].apply(np.log1p)
-
-    # Encode 'species', 'upstream200' and 'stress_condition' columns as IDs
-    max_length = max(df["upstream200"].apply(lambda x: len(x)))
-    df["upstream200"] = df["upstream200"].apply(
-        lambda seq: onehot_encode_dna(seq, max_length)
+    averages_df = data_df.copy()
+    stress_conditions = set(
+        [name.split("_")[0] for name in data_df.columns if "tpm" in name]
     )
-    df["species_id"] = pd.factorize(df["species"])[0]
-    df["stress_condition_id"] = pd.factorize(df["stress_condition"])[0]
-    df.drop(columns=["chromosome"], inplace=True)
+    control_condition = "ctrl"
+    control_columns = [
+        name for name in data_df.columns if control_condition + "_" in name
+    ]
+    if normalize_by_ctrl:
+        stress_conditions.remove(control_condition)
 
-    return df
+    for stress in stress_conditions:
+        stress_columns = [name for name in data_df.columns if stress + "_" in name]
+        if normalize_by_ctrl:
+            if stress == control_condition:
+                continue
+            averages_df[f"{stress}"] = get_ctrl_norm(data_df=data_df,
+                                                     stress_columns=stress_columns,
+                                                     control_columns=control_columns)
+
+        else:
+            averages_df[f"{stress}"] = get_mean(data_df=data_df,
+                                                stress_columns=stress_columns)
+
+    averages_df = preprocess_data(df=averages_df,
+                                  stress_conditions=stress_conditions)
+
+    if normalize_by_log:
+        averages_df["stress"] = get_log_norm(df=averages_df, normalize_by_ctrl=normalize_by_ctrl)
+
+    averages_df = averages_df
+    return averages_df
 
 
-def prepare_datasets(data_df, species_id=-1, size=-1, test_split=0.1):
+def prepare_datasets(data_df,
+                     species_id=-1,
+                     size=-1,
+                     test_split=0.1):
     """
     Load and preprocess data, and split it into training and testing datasets.
 
