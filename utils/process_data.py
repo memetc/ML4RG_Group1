@@ -9,6 +9,7 @@ from .helpers import species_name_to_abb
 from .normalizations import ctrl_normalize
 
 import pandas as pd
+from typing import Any, Optional
 
 BASES = "ATCGRYSWKMBDHVN"
 # The valid characters including IUPAC degenerate base symbols
@@ -61,10 +62,36 @@ def onehot_encode_dna(sequence: str, max_length: int) -> np.ndarray:
     return onehot_encoded
 
 
+def one_hot_encode_to_numpy(df: pd.DataFrame, column_name: str, new_column_name: Optional[str] = None) -> pd.DataFrame:
+    """
+    One-hot encodes the specified column of the DataFrame and adds the encoded vectors as numpy arrays in a new column.
+
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column_name (str): The name of the column to be one-hot encoded.
+    new_column_name (Optional[str]): The name of the new column to store the one-hot encoded vectors. If None, defaults to '{column_name}_encoded'.
+
+    Returns:
+    pd.DataFrame: The DataFrame with an added column containing the one-hot encoded vectors as numpy arrays.
+    """
+    # One-hot encode the specified column
+    encoded_df = pd.get_dummies(df[column_name], prefix=column_name)
+    
+    # Convert the one-hot encoded DataFrame to a numpy array
+    encoded_np = encoded_df.to_numpy(dtype=int)
+    
+    # Assign the numpy arrays back to the DataFrame in a new column
+    if new_column_name is None:
+        new_column_name = column_name + '_encoded'
+    
+    df[new_column_name] = list(encoded_np)
+    
+    return df
+
 def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     print("Preprocessing started")
 
-    id_columns = ["species", "upstream200", "chromosome"]
+    id_columns = ["species_name", "upstream200", "chromosome"]
     tpm_columns = [col for col in df.columns if "tpm" in col]
 
     df = df.dropna(subset=["upstream200"])
@@ -87,7 +114,7 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     )
     df.dropna(subset=["tpm"], inplace=True)
     df["condition"] = df["condition"].str.replace("_ge_tpm", "")
-    df[["species_abbreviation", "stress_condition", "evaluation"]] = df[
+    df[["species_abbreviation", "stress_condition_name", "evaluation"]] = df[
         "condition"
     ].str.rsplit("_", n=2, expand=True)
 
@@ -123,33 +150,39 @@ def get_processed_data(
 
     df = pd.read_csv(merged_data_path)
 
-    df["species"] = df.species.map(species_name_to_abb)
+    df["species_name"] = df['species'].map(species_name_to_abb)
+    df.drop(columns=["species"], inplace=True)
 
     if normalize_by_ctrl:
         df = ctrl_normalize(df)
 
     df = preprocess_data(df)
 
-    id_columns = ["species", "upstream200", "chromosome"]
+    id_columns = ["species_name", "upstream200", "chromosome"]
 
     if aggregate == "mean":
-        df = df.groupby(id_columns + ["stress_condition"])["tpm"].mean().reset_index()
+        df = df.groupby(id_columns + ["stress_condition_name"])["tpm"].mean().reset_index()
     elif aggregate == "max":
-        df = df.groupby(id_columns + ["stress_condition"])["tpm"].max().reset_index()
+        df = df.groupby(id_columns + ["stress_condition_name"])["tpm"].max().reset_index()
 
     if normalize_by_ctrl:
-        df = df[df["stress_condition"] != "ctrl"]
+        df = df[df["stress_condition_name"] != "ctrl"]
 
     if log_transform:
-        df["tpm"] = df["tpm"].apply(np.log1p)
+        if normalize_by_ctrl:
+            log_tranformation_fn = np.log
+        else:
+            log_tranformation_fn = np.log1p
+        df["tpm"] = df["tpm"].apply(log_tranformation_fn)
 
     # Encode 'species', 'upstream200' and 'stress_condition' columns as IDs
     max_length = max(df["upstream200"].apply(lambda x: len(x)))
     df["upstream200"] = df["upstream200"].apply(
         lambda seq: onehot_encode_dna(seq, max_length)
     )
-    df["species_id"] = pd.factorize(df["species"])[0]
-    df["stress_condition_id"] = pd.factorize(df["stress_condition"])[0]
+    df = one_hot_encode_to_numpy(df, "species_name", new_column_name='species')
+    df = one_hot_encode_to_numpy(df, "stress_condition_name", new_column_name='stress_condition')
+    print(df.columns)    
     df.drop(columns=["chromosome"], inplace=True)
 
     return df
@@ -171,15 +204,15 @@ def prepare_datasets(data_df, species_id=-1, size=-1, test_split=0.1):
     - test_dataset (SequenceDataset): The testing dataset.
     """
     if species_id != -1:
-        data_df = data_df[data_df["species"].apply(lambda x: x[species_id] == 1)]
+        data_df = data_df[data_df["species_name"].apply(lambda x: x[species_id] == 1)]
     if size != -1:
         size = int(size * 1.39)
         data_df = data_df.sample(size)
 
     # split the data into training and testing
     X_train, X_test, y_train, y_test = train_test_split(
-        data_df[["species", "stress_name", "upstream200"]],
-        data_df["stress"],
+        data_df[["species", "stress_condition", "upstream200"]],
+        data_df["stress_condition"],
         test_size=test_split,
     )
 
