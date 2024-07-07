@@ -255,12 +255,12 @@ def prepare_datasets(data_df, species_id=-1, size=-1, test_split=0.1):
 
 
 def main():
-    processed_data_path = f"{os.getcwd()}/data/processed_data_finall.csv"
+    processed_data_path = f"{os.getcwd()}/data/processed_data.pkl"
     processed_df = get_processed_data()
 
     # Save the merged data to a CSV file
     print(f"Data is being saved {processed_data_path}")
-    processed_df.to_csv(processed_data_path)
+    processed_df.to_pickle(processed_data_path)
     print(f"Processed data saved to {processed_data_path}")
 
 
