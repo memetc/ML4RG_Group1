@@ -195,7 +195,6 @@ def get_processed_data(
     df = one_hot_encode_to_numpy(
         df, "stress_condition_name", new_column_name="stress_condition"
     )
-    print(df.columns)
     df.drop(columns=["chromosome"], inplace=True)
 
     return df
