@@ -113,6 +113,11 @@ def get_processed_data(project_root_dir: str = None,
             averages_df[f"{stress}"] = get_mean(data_df=data_df,
                                                 stress_columns=stress_columns)
 
+    if normalize_by_ctrl:
+        averages_df = averages_df.drop(
+            columns=[name for name in averages_df.columns if "ctrl" in name]
+        )
+
     averages_df = preprocess_data(df=averages_df,
                                   stress_conditions=stress_conditions)
 
