@@ -134,12 +134,10 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     )
     df.dropna(subset=["tpm"], inplace=True)
     df["condition"] = df["condition"].str.replace("_ge_tpm", "")
-    df[["species_abbreviation", "stress_condition_name", "evaluation"]] = df[
-        "condition"
-    ].str.rsplit("_", n=2, expand=True)
-
-    df.drop(columns=["condition", "species_abbreviation"], inplace=True)
-
+    df[["stress_condition_name", "evaluation"]] = df["condition"].str.rsplit(
+        "_", n=1, expand=True
+    )
+    df.drop(columns=["condition"], inplace=True)
     return df
 
 
