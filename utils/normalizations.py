@@ -23,19 +23,14 @@ def ctrl_normalize(df: pd.DataFrame) -> pd.DataFrame:
     species_list = df["species_name"].unique()
 
     # Identify the unique conditions and repetitions for each species
-    tpm_columns = defaultdict(lambda: defaultdict(str))
-    for col in df.columns:
-        if "tpm" in col:
-            stress, rep = col.split("_")[:2]
-            if stress != CONTROL_CONDITION_KEY:
-                for species in species_list:
-                    tpm_columns[species][stress] = rep
+    tpm_columns = [col for col in df.columns if "tpm" in col if CONTROL_CONDITION_KEY not in col]
 
     # Divide each <CONDITION>_<REPETITION> by the corresponding <CONDITION>_<REPETITION> for each species
-    for species in species_list:
-        for stress, rep in tpm_columns[species].items():
-            condition_col = f"{stress}_{rep}_ge_tpm"
-            control_col = f"{CONTROL_CONDITION_KEY}_{rep}_ge_tpm"
+    for col in tpm_columns:
+        stress, rep = col.split("_")[:2]
+        condition_col = f"{stress}_{rep}_ge_tpm"
+        control_col = f"{CONTROL_CONDITION_KEY}_{rep}_ge_tpm"
+        for species in species_list:
             if control_col in df.columns and condition_col in df.columns:
                 mask = df["species_name"] == species
                 df.loc[mask, condition_col] = np.where(
@@ -47,6 +42,5 @@ def ctrl_normalize(df: pd.DataFrame) -> pd.DataFrame:
                         df.loc[mask, condition_col] / df.loc[mask, control_col],
                     ),
                 )
-            if control_col in df.columns:
-                df.drop(columns=[control_col], inplace=True)
+
     return df
