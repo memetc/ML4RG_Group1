@@ -198,6 +198,8 @@ def get_processed_data(
     if normalize_by_ctrl:
         df = df[df["stress_condition_name"] != "ctrl"]
 
+    df = df[df['tpm'] != 0]
+
     if log_transform:
         if normalize_by_ctrl:
             log_tranformation_fn = np.log
@@ -217,41 +219,6 @@ def get_processed_data(
     df.drop(columns=["chromosome"], inplace=True)
 
     return df
-
-
-def prepare_datasets(data_df, species_id=-1, size=-1, test_split=0.1):
-    """
-    Load and preprocess data, and split it into training and testing datasets.
-
-    Parameters:
-    - species_id (int, optional): The index of the species ID to filter by. Default is -1 (no filtering).
-    - size (int, optional): The number of samples to include. Default is -1 (use all data).
-    - val_split (float, optional): The proportion of the data to use for validation. Default is 0.2.
-    - test_split (float, optional): The proportion of the data to use for testing. Default is 0.1.
-    - data_df (pd.DataFrame, optional): A DataFrame to load and preprocess. If not provided, the function reads from 'combined_data.csv'.
-
-    Returns:
-    - train_dataset (SequenceDataset): The training dataset.
-    - test_dataset (SequenceDataset): The testing dataset.
-    """
-    if species_id != -1:
-        data_df = data_df[data_df["species_name"].apply(lambda x: x[species_id] == 1)]
-    if size != -1:
-        size = int(size * 1.39)
-        data_df = data_df.sample(size)
-
-    # split the data into training and testing
-    X_train, X_test, y_train, y_test = train_test_split(
-        data_df[["species", "stress_condition", "upstream200"]],
-        data_df["stress_condition"],
-        test_size=test_split,
-    )
-
-    # create a dataset
-    train_dataset = SequenceDataset(X_train, y_train)
-    test_dataset = SequenceDataset(X_test, y_test)
-
-    return train_dataset, test_dataset
 
 
 def main():
