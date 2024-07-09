@@ -198,7 +198,8 @@ def get_processed_data(
     if normalize_by_ctrl:
         df = df[df["stress_condition_name"] != "ctrl"]
 
-    df = df[df['tpm'] != 0]
+    df = df[df["tpm"] != 0]
+    df = df.reset_index(drop=True)
 
     if log_transform:
         if normalize_by_ctrl:
@@ -225,7 +226,7 @@ def main():
     processed_data_path = f"{os.getcwd()}/data/processed_data.pkl"
     processed_df = get_processed_data()
 
-    # Save the merged data to a CSV file
+    # Save the merged data to a pickle file
     print(f"Data is being saved {processed_data_path}")
     processed_df.to_pickle(processed_data_path)
     print(f"Processed data saved to {processed_data_path}")
