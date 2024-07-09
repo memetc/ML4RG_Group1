@@ -133,6 +133,9 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
         id_vars=id_columns,
     )
     df.dropna(subset=["tpm"], inplace=True)
+    df = df[df["tpm"] != 0]
+    df = df.reset_index(drop=True)
+    
     df["condition"] = df["condition"].str.replace("_ge_tpm", "")
     df[["stress_condition_name", "evaluation"]] = df["condition"].str.rsplit(
         "_", n=1, expand=True
@@ -175,7 +178,7 @@ def get_processed_data(
         df = ctrl_normalize(df)
 
     df = preprocess_data(df)
-
+    
     id_columns = ["species_name", "upstream200", "chromosome"]
 
     if aggregate == "mean":
@@ -193,9 +196,6 @@ def get_processed_data(
 
     if normalize_by_ctrl:
         df = df[df["stress_condition_name"] != "ctrl"]
-
-    df = df[df["tpm"] != 0]
-    df = df.reset_index(drop=True)
 
     if log_transform:
         if normalize_by_ctrl:

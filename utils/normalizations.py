@@ -43,11 +43,10 @@ def ctrl_normalize(df: pd.DataFrame) -> pd.DataFrame:
                     df.loc[mask, condition_col],
                     np.where(
                         df.loc[mask, control_col] == 0,
-                        df.loc[mask, condition_col],
+                        0.,
                         df.loc[mask, condition_col] / df.loc[mask, control_col],
                     ),
                 )
             if control_col in df.columns:
                 df.drop(columns=[control_col], inplace=True)
-
     return df
