@@ -43,8 +43,7 @@ species_abb_to_name = {
     "UPEC": "Escherichia coli UPEC 536",
     "FRAT": "Francisella tularensis subsp. holarctica FSC200",
     "HINF": "Haemophilus influenzae 86-028NP",
-    "HP_G27": "Helicobacter pylori G27",
-    "HPG27": "Helicobacter pylori G27",  # duplicate w/o undetrscore
+    "HP": "Helicobacter pylori G27",
     "HPJ99": "Helicobacter pylori J99",
     "KLEBS": "Klebsiella pneumoniae subsp. pneumoniae MGH 78578",
     "LEGIP": "Legionella pneumophila subsp. pneumophila Philadelphia 1",
@@ -68,7 +67,7 @@ species_abb_to_name = {
 
 species_name_to_abb = {v: k for k, v in species_abb_to_name.items()}
 species_name_to_abb["Borrelia burgdorferi B31"] = "BBURG"
-species_name_to_abb["Helicobacter pylori G28"] = "HPG27"
+species_name_to_abb["Helicobacter pylori G28"] = "HP"
 species_name_to_abb["Staphylococcus aureus MRSA252"] = "MRSA"
 species_name_to_abb["Staphylococcus aureus MSSA476"] = "MSSA"
 species_name_to_abb["Staphylococcus epidermidis 1457"] = "SEPI"
