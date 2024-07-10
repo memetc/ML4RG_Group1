@@ -20,7 +20,6 @@ def ctrl_normalize(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
     pd.DataFrame: The DataFrame with normalized TPM values.
     """
-    species_list = df["species_name"].unique()
 
     # Identify the unique conditions and repetitions for each species
     tpm_columns = [col for col in df.columns if "tpm" in col if CONTROL_CONDITION_KEY not in col]
@@ -30,17 +29,14 @@ def ctrl_normalize(df: pd.DataFrame) -> pd.DataFrame:
         stress, rep = col.split("_")[:2]
         condition_col = f"{stress}_{rep}_ge_tpm"
         control_col = f"{CONTROL_CONDITION_KEY}_{rep}_ge_tpm"
-        for species in species_list:
-            if control_col in df.columns and condition_col in df.columns:
-                mask = df["species_name"] == species
-                df.loc[mask, condition_col] = np.where(
-                    df.loc[mask, control_col].isna(),
-                    df.loc[mask, condition_col],
-                    np.where(
-                        df.loc[mask, control_col] == 0,
-                        0.,
-                        df.loc[mask, condition_col] / df.loc[mask, control_col],
-                    ),
-                )
-
+        if control_col in df.columns and condition_col in df.columns:
+            df[condition_col] = np.where(
+                df[control_col].isna(),
+                df[condition_col],
+                np.where(
+                    df[control_col] == 0,
+                    0.,
+                    df[condition_col] / df[control_col],
+                ),
+            )
     return df
