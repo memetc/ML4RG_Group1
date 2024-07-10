@@ -1,7 +1,12 @@
-import pandas as pd
 import torch
+import pandas as pd
+import numpy as np
+
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import GroupShuffleSplit
+from sklearn.preprocessing import StandardScaler
+import xgboost as xgb
+
 from typing import Tuple
 
 
@@ -44,26 +49,135 @@ def stratified_split(
     return df_train, df_val, df_test
 
 
-def prepare_tensors(
-    df: pd.DataFrame,
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+def prepare_numpy_arrays(
+    df: pd.DataFrame, scaler: StandardScaler = None
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, StandardScaler]:
     """
-    Converts dataframe columns to PyTorch tensors.
+    Converts the input dataframe into numpy arrays for features and target and applies z-normalization to the target.
+
+    Args:
+        df (pd.DataFrame): The input dataframe with necessary columns.
+        scaler (StandardScaler): Optional StandardScaler to use for normalization.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, StandardScaler]: Arrays for features and normalized target, and the scaler used.
+    """
+    sequence_array = np.array(df["upstream200"].to_list(), dtype=np.float32).reshape(
+        len(df), -1
+    )
+    species_array = np.array(df["species"].to_list(), dtype=np.float32)
+    stress_array = np.array(df["stress_condition"].to_list(), dtype=np.float32)
+
+    y = np.array(df["tpm"].values, dtype=np.float32).reshape(-1, 1)
+
+    if scaler is None:
+        scaler = StandardScaler()
+        y = scaler.fit_transform(y)
+    else:
+        y = scaler.transform(y)
+
+    return sequence_array, species_array, stress_array, y, scaler
+
+
+def create_datasets_for_xgboost(
+    df: pd.DataFrame,
+) -> Tuple[
+    Tuple[np.ndarray, np.ndarray],
+    Tuple[np.ndarray, np.ndarray],
+    Tuple[np.ndarray, np.ndarray],
+]:
+    """
+    Splits the data into training, validation, and test sets, prepares numpy arrays with scaling,
+    and converts the data to DMatrix format for XGBoost.
 
     Args:
         df (pd.DataFrame): The input dataframe with necessary columns.
 
     Returns:
-        Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: Tensors for sequences, species, stress conditions, and labels.
+        Tuple[Tuple[np.ndarray, np.ndarray], Tuple[np.ndarray, np.ndarray], Tuple[np.ndarray, np.ndarray]]: Numpy arrays for training, validation, and test sets.
+    """
+    # Split the data
+    df_train, df_val, df_test = stratified_split(df)
+
+    # Prepare numpy arrays with scaling
+    (
+        sequence_array_train,
+        species_array_train,
+        stress_array_train,
+        y_array_train,
+        scaler,
+    ) = prepare_numpy_arrays(df_train)
+    sequence_array_val, species_array_val, stress_array_val, y_array_val, _ = (
+        prepare_numpy_arrays(df_val, scaler)
+    )
+    sequence_array_test, species_array_test, stress_array_test, y_array_test, _ = (
+        prepare_numpy_arrays(df_test, scaler)
+    )
+
+    X_train = np.concatenate(
+        (sequence_array_train, species_array_train, stress_array_train), axis=1
+    )
+    X_val = np.concatenate(
+        (sequence_array_val, species_array_val, stress_array_val), axis=1
+    )
+    X_test = np.concatenate(
+        (sequence_array_test, species_array_test, stress_array_test), axis=1
+    )
+
+    return (X_train, y_array_train), (X_val, y_array_val), (X_test, y_array_test)
+
+
+def prepare_dmatrices(df: pd.DataFrame) -> Tuple[xgb.DMatrix, xgb.DMatrix, xgb.DMatrix]:
+    """
+    Converts the input dataframe to DMatrix format for XGBoost.
+
+    Args:
+        df (pd.DataFrame): The input dataframe with necessary columns.
+
+    Returns:
+        Tuple[xgb.DMatrix, xgb.DMatrix, xgb.DMatrix]: DMatrix objects for training, validation, and test sets.
+    """
+    (X_train, y_array_train), (X_val, y_array_val), (X_test, y_array_test) = (
+        create_datasets_for_xgboost(df)
+    )
+
+    dtrain = xgb.DMatrix(X_train, label=y_array_train)
+    dval = xgb.DMatrix(X_val, label=y_array_val)
+    dtest = xgb.DMatrix(X_test, label=y_array_test)
+
+    return dtrain, dval, dtest
+
+
+def prepare_tensors(
+    df: pd.DataFrame, scaler: StandardScaler = None
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, StandardScaler]:
+    """
+    Converts dataframe columns to PyTorch tensors and applies z-normalization to the target.
+
+    Args:
+        df (pd.DataFrame): The input dataframe with necessary columns.
+        scaler (StandardScaler): Optional StandardScaler to use for normalization.
+
+    Returns:
+        Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, StandardScaler]: Tensors for sequences, species, stress conditions, labels, and the scaler used.
     """
     sequence_tensor = torch.tensor(
         df["upstream200"].to_list(), dtype=torch.float32
     ).permute(0, 2, 1)
     species_tensor = torch.tensor(df["species"].to_list(), dtype=torch.float32)
     stress_tensor = torch.tensor(df["stress_condition"].to_list(), dtype=torch.float32)
-    y_tensor = torch.tensor(df["tpm"].values, dtype=torch.float32).unsqueeze(1)
 
-    return sequence_tensor, species_tensor, stress_tensor, y_tensor
+    y = np.array(df["tpm"].values, dtype=np.float32).reshape(-1, 1)
+
+    if scaler is None:
+        scaler = StandardScaler()
+        y = scaler.fit_transform(y)
+    else:
+        y = scaler.transform(y)
+
+    y_tensor = torch.tensor(y, dtype=torch.float32)
+
+    return sequence_tensor, species_tensor, stress_tensor, y_tensor, scaler
 
 
 def create_datasets_and_loaders(
@@ -81,14 +195,18 @@ def create_datasets_and_loaders(
     Returns:
         Tuple[DataLoader, DataLoader, DataLoader]: Dataloaders for training, validation, and test sets.
     """
-    sequence_tensor_train, species_tensor_train, stress_tensor_train, y_tensor_train = (
-        prepare_tensors(df_train)
+    (
+        sequence_tensor_train,
+        species_tensor_train,
+        stress_tensor_train,
+        y_tensor_train,
+        scaler,
+    ) = prepare_tensors(df_train)
+    sequence_tensor_val, species_tensor_val, stress_tensor_val, y_tensor_val, _ = (
+        prepare_tensors(df_val, scaler)
     )
-    sequence_tensor_val, species_tensor_val, stress_tensor_val, y_tensor_val = (
-        prepare_tensors(df_val)
-    )
-    sequence_tensor_test, species_tensor_test, stress_tensor_test, y_tensor_test = (
-        prepare_tensors(df_test)
+    sequence_tensor_test, species_tensor_test, stress_tensor_test, y_tensor_test, _ = (
+        prepare_tensors(df_test, scaler)
     )
 
     train_dataset = TensorDataset(
@@ -122,7 +240,4 @@ def prepare_data_loaders(
         Tuple[DataLoader, DataLoader, DataLoader]: Dataloaders for training, validation, and test sets.
     """
     df_train, df_val, df_test = stratified_split(df)
-    train_loader, val_loader, test_loader = create_datasets_and_loaders(
-        df_train, df_val, df_test, batch_size
-    )
-    return train_loader, val_loader, test_loader
+    return create_datasets_and_loaders(df_train, df_val, df_test, batch_size)
