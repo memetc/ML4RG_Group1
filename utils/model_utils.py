@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.optim as optim
 import random
 
-from torch.utils.data import DataLoader
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from models.simple_cnn import SimpleCNN
 from models.cnn_v2 import CNNV2
@@ -126,12 +125,15 @@ def train(config, train_loader, val_loader):
         net.train()
         running_loss = 0.0
         for i, data in enumerate(train_loader, 0):
-            inputs, labels = data
+            inputs, labels = data[:-1], data[-1]
             inputs, labels = [i.to(device) for i in inputs], labels.to(device)
 
             optimizer.zero_grad()
 
-            outputs = net(inputs)
+            outputs = net(*inputs)
+
+            labels = labels.view(-1, 1)  # Reshape labels to match the output shape [batch_size, 1]
+
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
@@ -144,10 +146,12 @@ def train(config, train_loader, val_loader):
         val_loss = 0.0
         val_steps = 0
         for i, data in enumerate(val_loader, 0):
-            inputs, labels = data
+            inputs, labels = data[:-1], data[-1]
             inputs, labels = [i.to(device) for i in inputs], labels.to(device)
 
-            outputs = net(inputs)
+            outputs = net(*inputs)
+            labels = labels.view(-1, 1)  # Reshape labels to match the output shape [batch_size, 1]
+
             loss = criterion(outputs, labels)
 
             val_loss += loss.cpu().detach().numpy()
@@ -168,7 +172,7 @@ def train(config, train_loader, val_loader):
     return net, train_losses, val_losses
 
 
-def predict(config, net, test_dataset):
+def predict(net, test_loader):
     """
     Generate predictions using the trained model on the test dataset.
 
@@ -189,9 +193,6 @@ def predict(config, net, test_dataset):
     net.to(device)
     net.eval()
 
-    test_loader = DataLoader(
-        test_dataset, batch_size=config["batch_size"], shuffle=False
-    )
 
     all_predictions = []
     all_labels = []
@@ -200,11 +201,11 @@ def predict(config, net, test_dataset):
     # Iterates over the test DataLoader to generate predictions
     with torch.no_grad():
         for i, data in enumerate(test_loader, 0):
-            inputs, labels = data
+            inputs, labels = data[:-1], data[-1]
             inputs = [i.to(device) for i in inputs]
             labels = labels.to(device)
 
-            outputs = net(inputs)
+            outputs = net(*inputs)
             species_ids = np.argmax(inputs[0].cpu().numpy(), axis=1)
             stress_ids = np.argmax(inputs[1].cpu().numpy(), axis=1)
 

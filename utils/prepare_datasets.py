@@ -15,6 +15,7 @@ def stratified_split(
     test_size: float = 0.2,
     val_size: float = 0.25,
     random_state: int = 42,
+    sample_size: float = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Performs a stratified split using GroupShuffleSplit to create training, validation, and test sets.
@@ -24,10 +25,18 @@ def stratified_split(
         test_size (float): The proportion of the dataset to include in the test split.
         val_size (float): The proportion of the train_val split to include in the validation split.
         random_state (int): Random state for reproducibility.
+        sample_size (float): Fraction (0 < sample_size <= 1) or absolute number (>1) of samples to retain.
 
     Returns:
         Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]: The training, validation, and test dataframes.
     """
+    # Sample the dataframe if sample_size is specified
+    if sample_size is not None:
+        if sample_size > 1:
+            df = df.sample(n=int(sample_size), random_state=random_state)
+        else:
+            df = df.sample(frac=sample_size, random_state=random_state)
+
     df["group"] = (
         df["species_name"].astype(str) + "_" + df["stress_condition_name"].astype(str)
     )
@@ -227,7 +236,7 @@ def create_datasets_and_loaders(
 
 
 def prepare_data_loaders(
-    df: pd.DataFrame, batch_size: int
+    df: pd.DataFrame, batch_size: int, sample_size: float = None
 ) -> Tuple[DataLoader, DataLoader, DataLoader]:
     """
     Processes the input dataframe and returns PyTorch dataloaders for training, validation, and test sets.
@@ -239,5 +248,5 @@ def prepare_data_loaders(
     Returns:
         Tuple[DataLoader, DataLoader, DataLoader]: Dataloaders for training, validation, and test sets.
     """
-    df_train, df_val, df_test = stratified_split(df)
+    df_train, df_val, df_test = stratified_split(df, sample_size=sample_size)
     return create_datasets_and_loaders(df_train, df_val, df_test, batch_size)

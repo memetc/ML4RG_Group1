@@ -21,13 +21,14 @@ class CNNV2(nn.Module):
         )
         hidden_size = kwargs["hidden_size"] if "hidden_size" in kwargs else 30
         cnn_filters = kwargs["cnn_filters"] if "cnn_filters" in kwargs else hidden_size
+        kernel_size = kwargs["kernel_size"] if "kernel_size" in kwargs else 30
 
         # activation functions
         self.activation = kwargs["activation"] if "activation" in kwargs else nn.ReLU()
 
         # Input layers
-        self.input_base = nn.Conv2d(1, cnn_filters, kernel_size=4)
-        self.bn_base = nn.BatchNorm2d(cnn_filters)  # Batch normalization for conv layer
+        self.input_sequence = nn.Conv2d(1, cnn_filters, kernel_size=(4, kernel_size))
+        self.bn_sequence = nn.BatchNorm2d(cnn_filters)  # Batch normalization for conv layer
 
         self.input_species = nn.Linear(species_size, hidden_size)
         self.bn_species = nn.BatchNorm1d(hidden_size)  # Batch normalization for species
@@ -61,16 +62,16 @@ class CNNV2(nn.Module):
             if module.bias is not None:
                 nn.init.zeros_(module.bias)
 
-    def forward(self, input):
-        x_species, x_stress_condition, x_base = input
+    def forward(self, x_sequence, x_species, x_stress_condition):
 
         # Base sequence processing
-        x_base = self.input_base(x_base)
-        x_base = self.bn_base(x_base)  # Apply batch normalization
-        x_base = self.activation(x_base)
-        x_base = x_base.squeeze()
-        x_base = self.global_average_pool(x_base)
-        x_base = x_base.squeeze()
+        x_sequence = x_sequence.unsqueeze(1)
+        x_sequence = self.input_sequence(x_sequence)
+        x_sequence = self.bn_sequence(x_sequence)  # Apply batch normalization
+        x_sequence = self.activation(x_sequence)
+        x_sequence = x_sequence.squeeze()
+        x_sequence = self.global_average_pool(x_sequence)
+        x_sequence = x_sequence.squeeze()
 
         # Process species and stress condition
         x_species = self.input_species(x_species)
@@ -84,7 +85,7 @@ class CNNV2(nn.Module):
         x_stress_condition = self.activation(x_stress_condition)
 
         # Concatenation
-        x = torch.cat((x_species, x_stress_condition, x_base), dim=1)
+        x = torch.cat((x_sequence, x_species, x_stress_condition), dim=1)
 
         # Hidden layer
         x = self.hidden(x)
