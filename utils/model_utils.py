@@ -5,11 +5,9 @@ import torch.optim as optim
 import random
 
 from torch.utils.data import DataLoader
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from models.simple_cnn import SimpleCNN
 from models.cnn_v2 import CNNV2
-from .process_data import prepare_datasets
 
 
 class EarlyStopping:
@@ -77,7 +75,7 @@ class EarlyStopping:
         torch.save(model.state_dict(), "last_checkpoint.pt")
 
 
-def train(config, train_dataset):
+def train(config, train_loader, val_loader):
     """
     Train a neural network model based on the provided configuration.
 
@@ -119,18 +117,6 @@ def train(config, train_dataset):
     early_stopping = EarlyStopping(patience=7, verbose=True)
 
     # Loads and preprocesses the training and testing data.
-
-
-
-    train_dataset, val_dataset = train_test_split(train_dataset, test_size=0.2)
-
-    print(
-        f"Training on {len(train_dataset)} samples, testing on {len(val_dataset)} samples"
-    )
-    train_loader = DataLoader(
-        train_dataset, batch_size=config["batch_size"], shuffle=True
-    )
-    val_loader = DataLoader(val_dataset, batch_size=config["batch_size"], shuffle=True)
 
     train_losses = []
     val_losses = []
@@ -296,6 +282,8 @@ def random_search(train_dataset, test_size, param_dist, n_iter=10):
             "species_id": -1,
             "test_size": test_size,
             "model_version": 1,
+            "stress_condition_size": 11,
+
         }
 
         net, train_losses, val_losses = train(config, train_dataset)
