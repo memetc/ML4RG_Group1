@@ -6,12 +6,32 @@ from sklearn.model_selection import train_test_split
 from utils.helpers import SequenceDataset
 from utils.normalizations import get_ctrl_norm, get_mean, get_log_norm
 
+from collections import Counter
+
+def generate_kmers(sequence, k=3):
+    if isinstance(sequence, str):
+        kmers = [sequence[i:i+k] for i in range(len(sequence) - k + 1)]
+        return kmers
+    else:
+        return []
+def get_kmer_dataframe(df):
+    kmer_counts = {}
+
+    for i, seq in enumerate(df.upstream200):
+        kmers = generate_kmers(seq, 3)
+        kmer_counts[i] = Counter(kmers)
+
+    kmer_df = pd.DataFrame(kmer_counts).fillna(0).T
+    return pd.concat([df, kmer_df], axis=1)
+
 
 def preprocess_data(df: pd.DataFrame, stress_conditions: set) -> pd.DataFrame:
     print("Preprocessing started")
-
     # drop rows with missing upstream200 sequences
     df = df.dropna(subset=["upstream200"])
+    df.reset_index(drop=True, inplace=True)
+    df = get_kmer_dataframe(df)
+
     # drop rows with upstream200 sequences that contain anything but A, T, C, G
     df = df[
         df["upstream200"].apply(
@@ -64,6 +84,7 @@ def preprocess_data(df: pd.DataFrame, stress_conditions: set) -> pd.DataFrame:
 
     # drop rows with 0 stress
     df = df[df["stress"] > 0]
+    df.reset_index(drop=True, inplace=True)
     return df
 
 
@@ -160,6 +181,18 @@ def prepare_datasets(data_df,
 
     return train_dataset, test_dataset
 
+
+def transform_dataframe(df):
+    # Convert one-hot encoded lists to numeric values for species
+    df['species'] = df['species'].apply(lambda x: x.index(1) if 1 in x else -1)
+
+    # Convert one-hot encoded lists to numeric values for stress_name
+    df['stress_name'] = df['stress_name'].apply(lambda x: x.index(1) if 1 in x else -1)
+
+    # Drop the upstream200 column
+    df = df.drop(columns=['upstream200'])
+
+    return df
 
 def main():
     processed_data_path = f"{os.getcwd()}/data/processed_data.pkl"

@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from models.simple_cnn import SimpleCNN
 from models.cnn_v2 import CNNV2
-from .process_data import prepare_datasets
+import concurrent.futures
 
 
 class EarlyStopping:
@@ -116,7 +116,7 @@ def train(config, train_dataset):
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, "min", patience=3, factor=0.5
     )
-    early_stopping = EarlyStopping(patience=7, verbose=True)
+    early_stopping = EarlyStopping(patience=4, verbose=True)
 
     # Loads and preprocesses the training and testing data.
 
@@ -259,55 +259,6 @@ def evaluate(predictions, labels):
     r2 = r2_score(labels, predictions)
 
     return mse, mae, r2
-
-
-def random_search(train_dataset, test_size, param_dist, n_iter=10):
-    """
-    Perform a random search to find the best hyperparameters for training a neural network model.
-
-    Parameters:
-    - data_df (pd.DataFrame): The DataFrame containing the dataset.
-    - species_id (int): The ID of the species to filter data by.
-    - test_size (int): The number of samples to include in the test dataset.
-    - param_dist (dict): A dictionary containing the distributions of hyperparameters to sample from.
-      It should include:
-        - 'lr': A distribution for learning rates.
-        - 'cnn_filters': A distribution for the number of CNN filters.
-        - 'batch_size': A distribution for batch sizes.
-        - 'hidden_size': A distribution for hidden layer sizes.
-        - 'activation': A list of activation functions to choose from.
-    - n_iter (int, optional): The number of iterations to perform. Default is 10.
-
-    Returns:
-    - best_config (dict): The best hyperparameter configuration found.
-    """
-    best_config = None
-    best_val_loss = float("inf")
-
-    for i in range(n_iter):
-        # Randomly sample hyperparameters
-        config = {
-            "lr": param_dist["lr"].rvs(),
-            "cnn_filters": param_dist["cnn_filters"].rvs(),
-            "batch_size": param_dist["batch_size"].rvs(),
-            "hidden_size": param_dist["hidden_size"].rvs(),
-            "activation": random.choice(param_dist["activation"]),
-            "epochs": 50,
-            "species_id": -1,
-            "test_size": test_size,
-            "model_version": 1,
-        }
-
-        net, train_losses, val_losses = train(config, train_dataset)
-
-        if min(val_losses) < best_val_loss:
-            best_val_loss = min(val_losses)
-            best_config = config
-
-        print(f"Val Loss: {min(val_losses)}")
-
-    print(f"Best Config: {best_config}, Best Val Loss: {best_val_loss}")
-    return best_config, net
 
 
 def inverse_normalize(values):
