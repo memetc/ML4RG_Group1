@@ -182,7 +182,7 @@ def prepare_datasets(data_df,
     return train_dataset, test_dataset
 
 
-def transform_dataframe(df):
+def transform_dataframe(df, drop_upstream=True):
     # Convert one-hot encoded lists to numeric values for species
     df['species'] = df['species'].apply(lambda x: x.index(1) if 1 in x else -1)
 
@@ -190,7 +190,8 @@ def transform_dataframe(df):
     df['stress_name'] = df['stress_name'].apply(lambda x: x.index(1) if 1 in x else -1)
 
     # Drop the upstream200 column
-    df = df.drop(columns=['upstream200'])
+    if drop_upstream:
+        df = df.drop(columns=['upstream200'])
 
     return df
 
