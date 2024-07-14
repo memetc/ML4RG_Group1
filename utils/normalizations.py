@@ -63,4 +63,4 @@ def get_mean(data_df, stress_columns):
 
 def get_log_norm(df: pd.DataFrame, normalize_by_ctrl: bool):
     # log values of stress conditions
-    return df["stress"].apply(lambda x: np.log(x)) if normalize_by_ctrl else df["stress"].apply(lambda x: np.log(x + 1))
+    return df["tpm"].apply(lambda x: np.log(x)) if normalize_by_ctrl else df["tpm"].apply(lambda x: np.log(x + 1))

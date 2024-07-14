@@ -25,7 +25,11 @@ def get_kmer_dataframe(df, k=3):
     return pd.concat([df, kmer_df], axis=1)
 
 
-def preprocess_data(df: pd.DataFrame, stress_conditions: set) -> pd.DataFrame:
+def preprocess_data(df: pd.DataFrame,
+                    stress_conditions: set,
+                    upstream200_one_hot: bool = False,
+                    species_one_hot: bool = False,
+                    conditions_one_hot: bool = False) -> pd.DataFrame:
     print("Preprocessing started")
     # drop rows with missing upstream200 sequences
     df = df.dropna(subset=["upstream200"])
@@ -40,52 +44,56 @@ def preprocess_data(df: pd.DataFrame, stress_conditions: set) -> pd.DataFrame:
             lambda x: set(x).issubset({"A", "T", "C", "G"})
         )
     ]
-
     mlb = MultiLabelBinarizer()
-    # map each species id to a one hot encoding
-    df["species_id"] = df["species_id"].apply(lambda x: [x])
-    df["species"] = mlb.fit_transform(df["species_id"]).tolist()
+
+    if species_one_hot:
+        # map each species id to a one hot encoding
+        df["species_id"] = df["species_id"].apply(lambda x: [x])
+        df["species"] = mlb.fit_transform(df["species_id"]).tolist()
 
     # Drop the columns that are not needed
     df = df.drop(
         columns=[name for name in df.columns if "tpm" in name]
-                + ["chromosome", "region", "csv", "species_id"]
+                + ["chromosome", "region", "csv"]
     )
-
     # map each base to one hot encoding
     # One can refactor here to handle different letters
-    base_encodings = {
-        "A": [1, 0, 0, 0],
-        "T": [0, 1, 0, 0],
-        "C": [0, 0, 1, 0],
-        "G": [0, 0, 0, 1],
-    }
-    longest_sequence = max(df["upstream200"].apply(lambda x: len(x)))
-    df["upstream200"] = df["upstream200"].apply(
-        lambda x: [base_encodings[base] for base in x]
-                  + [[0, 0, 0, 0]] * (longest_sequence - len(x))
-    )
+
+    if upstream200_one_hot:
+        base_encodings = {
+            "A": [1, 0, 0, 0],
+            "T": [0, 1, 0, 0],
+            "C": [0, 0, 1, 0],
+            "G": [0, 0, 0, 1],
+        }
+
+        longest_sequence = max(df["upstream200"].apply(lambda x: len(x)))
+        df["upstream200"] = df["upstream200"].apply(
+            lambda x: [base_encodings[base] for base in x]
+                      + [[0, 0, 0, 0]] * (longest_sequence - len(x))
+        )
 
     # explode dataset to have one row per stress condition
-    df["stress"] = df.apply(
+    df["tpm"] = df.apply(
         lambda row: [{stress: row[stress]} for stress in stress_conditions], axis=1
     )
     df = df.drop(
         columns=[name for name in df.columns if name in stress_conditions]
     )
 
-    df = df.explode("stress")
-    df["stress_name"] = df["stress"].apply(
+    df = df.explode("tpm")
+    df["stress_name"] = df["tpm"].apply(
         lambda x: list(x.keys())[0]
     )
-    df["stress"] = df["stress"].apply(lambda x: list(x.values())[0])
+    df["tpm"] = df["tpm"].apply(lambda x: list(x.values())[0])
 
-    # one hot encode stress names
-    df["stress_name"] = df["stress_name"].apply(lambda x: [x])
-    df["stress_name"] = mlb.fit_transform(df["stress_name"]).tolist()
+    if conditions_one_hot:
+        # one hot encode stress names
+        df["stress_name"] = df["stress_name"].apply(lambda x: [x])
+        df["stress_name"] = mlb.fit_transform(df["stress_name"]).tolist()
 
     # drop rows with 0 stress
-    df = df[df["stress"] > 0]
+    df = df[df["tpm"] > 0]
     df.reset_index(drop=True, inplace=True)
     return df
 
@@ -93,7 +101,11 @@ def preprocess_data(df: pd.DataFrame, stress_conditions: set) -> pd.DataFrame:
 # Load the data
 def get_processed_data(project_root_dir: str = None,
                        normalize_by_ctrl: bool = True,
-                       normalize_by_log: bool = True) -> pd.DataFrame:
+                       normalize_by_log: bool = True,
+                       upstream200_one_hot: bool = False,
+                       species_one_hot: bool = False,
+                       conditions_one_hot: bool = False
+                       ) -> pd.DataFrame:
     """
     Load and preprocess the data for further analysis or model training.
 
@@ -137,10 +149,13 @@ def get_processed_data(project_root_dir: str = None,
                                                 stress_columns=stress_columns)
 
     averages_df = preprocess_data(df=averages_df,
-                                  stress_conditions=stress_conditions)
+                                  stress_conditions=stress_conditions,
+                                  upstream200_one_hot=upstream200_one_hot,
+                                  species_one_hot=species_one_hot,
+                                  conditions_one_hot=conditions_one_hot)
 
     if normalize_by_log:
-        averages_df["stress"] = get_log_norm(df=averages_df, normalize_by_ctrl=normalize_by_ctrl)
+        averages_df["tpm"] = get_log_norm(df=averages_df, normalize_by_ctrl=normalize_by_ctrl)
 
     averages_df = averages_df
     return averages_df
@@ -184,7 +199,7 @@ def prepare_datasets(data_df,
     return train_dataset, test_dataset
 
 
-def transform_dataframe(df, drop_upstream=True):
+def transform_one_hot_to_numeric(df, drop_upstream=True):
     # Convert one-hot encoded lists to numeric values for species
     df['species'] = df['species'].apply(lambda x: x.index(1) if 1 in x else -1)
 
@@ -197,9 +212,31 @@ def transform_dataframe(df, drop_upstream=True):
 
     return df
 
+
+# Function to create a mapping dictionary and convert the column to numeric IDs
+def transform_str_to_numeric_by_column(df, column_name):
+    unique_values = df[column_name].unique()
+    value_to_id = {value: idx for idx, value in enumerate(unique_values)}
+    df[column_name] = df[column_name].map(value_to_id)
+    return value_to_id
+
+def transform_str_to_numeric(df):
+    # Convert 'species_id' and 'stress_name' columns to numeric IDs
+    species_id_mapping = transform_str_to_numeric_by_column(df, 'species_id')
+    stress_name_mapping = transform_str_to_numeric_by_column(df, 'stress_name')
+
+    # Save the mappings to dictionaries
+    mappings = {
+        'species_id_mapping': species_id_mapping,
+        'stress_name_mapping': stress_name_mapping
+    }
+
+    return df, mappings
+
+
 def main():
-    processed_data_path = f"{os.getcwd()}/data/processed_data_kmer_fat.pkl"
-    processed_df = get_processed_data()
+    processed_data_path = f"{os.getcwd()}/data/processed_data_upstream1h.pkl"
+    processed_df = get_processed_data(upstream200_one_hot=True)
 
     # Save the merged data to a CSV file
     print(f"Data is being saved {processed_data_path}")
