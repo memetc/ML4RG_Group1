@@ -31,9 +31,8 @@ def preprocess_data(df: pd.DataFrame, stress_conditions: set) -> pd.DataFrame:
     df = df.dropna(subset=["upstream200"])
     df.reset_index(drop=True, inplace=True)
 
-    # Add K-mers for k: 3, 6
+    # Add K-mers for k: 3
     df = get_kmer_dataframe(df)
-    df = get_kmer_dataframe(df, 6)
 
     # drop rows with upstream200 sequences that contain anything but A, T, C, G
     df = df[
