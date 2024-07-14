@@ -1,5 +1,9 @@
 import pandas as pd
 import os
+import pickle
+import numpy as np
+
+from tqdm import tqdm
 
 from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.model_selection import train_test_split
@@ -30,6 +34,30 @@ def preprocess_data(df: pd.DataFrame, stress_conditions: set) -> pd.DataFrame:
                 + ["chromosome", "region", "csv", "species_id"]
     )
 
+    #####################################################################################################
+    K = 6
+    
+    if not os.path.exists(f"data/interm_{K}mers_data.pkl"):
+        best_6_mers = pickle.load(open(f"data/best_{K}_mers.pkl", "rb"))
+
+        def count_6_mers(row, stress):
+            species = np.array([row["species"]])
+            species = mlb.inverse_transform(species)[0][0]
+            if stress not in best_6_mers[species]:
+                kmercount = 0
+            else:
+                kmercount = row["upstream200"].count(best_6_mers[species][stress]) + 1
+            return kmercount
+
+        for stress in tqdm(stress_conditions):
+            df[f"{stress}_{K}mc"] = df.apply(lambda row: count_6_mers(row, stress), axis=1)
+        
+        df.to_pickle(f"data/interm_{K}mers_data.pkl")
+    else:
+        df = pd.read_pickle(f"data/interm_{K}mers_data.pkl")
+
+    #####################################################################################################
+
     # map each base to one hot encoding
     # One can refactor here to handle different letters
     base_encodings = {
@@ -59,8 +87,24 @@ def preprocess_data(df: pd.DataFrame, stress_conditions: set) -> pd.DataFrame:
     df["stress"] = df["stress"].apply(lambda x: list(x.values())[0])
 
     # one hot encode stress names
+    df["stress_name_intermediate"] = df["stress_name"]
+
+    def mul_stress_by_kmercount(row):
+        #print(row)
+        stress = pd.Series(row["stress_name"])
+        multiplier = row[f"{row['stress_name_intermediate']}_{K}mc"]
+        return (stress * multiplier).tolist()
+    
     df["stress_name"] = df["stress_name"].apply(lambda x: [x])
     df["stress_name"] = mlb.fit_transform(df["stress_name"]).tolist()
+
+    tqdm.pandas()
+    df["stress_name"] = df.progress_apply(lambda row: mul_stress_by_kmercount(row), axis=1)
+
+    df = df.drop(columns=[f"{stress}_{K}mc" for stress in stress_conditions]+["stress_name_intermediate"])
+
+    # interm_step
+    #df.to_pickle("data/interm_data.pkl")
 
     # drop rows with 0 stress
     df = df[df["stress"] > 0]
@@ -70,7 +114,8 @@ def preprocess_data(df: pd.DataFrame, stress_conditions: set) -> pd.DataFrame:
 # Load the data
 def get_processed_data(project_root_dir: str = None,
                        normalize_by_ctrl: bool = True,
-                       normalize_by_log: bool = True) -> pd.DataFrame:
+                       normalize_by_log: bool = True,
+                       apply_kmers: bool = True) -> pd.DataFrame:
     """
     Load and preprocess the data for further analysis or model training.
 

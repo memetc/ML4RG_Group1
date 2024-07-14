@@ -9,6 +9,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from models.simple_cnn import SimpleCNN
 from models.cnn_v2 import CNNV2
+from models.cnn_v3 import CNNV3
 from .process_data import prepare_datasets
 
 
@@ -106,6 +107,9 @@ def train(config, train_dataset):
     elif config["model_version"] == 0:
         print("Started training SimpleCNN")
         net = SimpleCNN(**config)
+    elif config["model_version"] == 2:
+        print("Started training CNNV3")
+        net = CNNV3(**config)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net.to(device)
@@ -116,7 +120,7 @@ def train(config, train_dataset):
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, "min", patience=3, factor=0.5
     )
-    early_stopping = EarlyStopping(patience=7, verbose=True)
+    early_stopping = EarlyStopping(patience=10, verbose=True)
 
     # Loads and preprocesses the training and testing data.
 
@@ -292,10 +296,12 @@ def random_search(train_dataset, test_size, param_dist, n_iter=10):
             "batch_size": param_dist["batch_size"].rvs(),
             "hidden_size": param_dist["hidden_size"].rvs(),
             "activation": random.choice(param_dist["activation"]),
+            'kernel_size': param_dist["hidden_size"].rvs(),
             "epochs": 50,
             "species_id": -1,
             "test_size": test_size,
-            "model_version": 1,
+            "model_version": 2,
+            "stress_condition_size": 11,
         }
 
         net, train_losses, val_losses = train(config, train_dataset)
