@@ -14,11 +14,11 @@ def generate_kmers(sequence, k=3):
         return kmers
     else:
         return []
-def get_kmer_dataframe(df):
+def get_kmer_dataframe(df, k=3):
     kmer_counts = {}
 
     for i, seq in enumerate(df.upstream200):
-        kmers = generate_kmers(seq, 3)
+        kmers = generate_kmers(seq, k)
         kmer_counts[i] = Counter(kmers)
 
     kmer_df = pd.DataFrame(kmer_counts).fillna(0).T
@@ -30,7 +30,10 @@ def preprocess_data(df: pd.DataFrame, stress_conditions: set) -> pd.DataFrame:
     # drop rows with missing upstream200 sequences
     df = df.dropna(subset=["upstream200"])
     df.reset_index(drop=True, inplace=True)
+
+    # Add K-mers for k: 3, 6
     df = get_kmer_dataframe(df)
+    df = get_kmer_dataframe(df, 6)
 
     # drop rows with upstream200 sequences that contain anything but A, T, C, G
     df = df[
@@ -196,7 +199,7 @@ def transform_dataframe(df, drop_upstream=True):
     return df
 
 def main():
-    processed_data_path = f"{os.getcwd()}/data/processed_data.pkl"
+    processed_data_path = f"{os.getcwd()}/data/processed_data_kmer_fat.pkl"
     processed_df = get_processed_data()
 
     # Save the merged data to a CSV file

@@ -96,6 +96,35 @@ def plot_predictions_vs_labels_by_species(
         plt.show()
 
 
+def filter_outliers(df, by_label):
+    """
+    Remove outliers from the dataset using the IQR method.
+
+    Parameters:
+    - df (DataFrame): The combined DataFrame containing predictions and labels.
+    - by_label (str): The label by which to group the data.
+
+    Returns:
+    - DataFrame: The DataFrame with outliers removed.
+    """
+    # Calculate Q1 (25th percentile) and Q3 (75th percentile)
+    Q1 = df.groupby(by_label)['Value'].quantile(0.25)
+    Q3 = df.groupby(by_label)['Value'].quantile(0.75)
+
+    # Calculate IQR
+    IQR = Q3 - Q1
+
+    # Define bounds for outliers
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+
+    # Remove outliers
+    filtered_df = df[
+        ~((df['Value'] < lower_bound[df[by_label]].values) | (df['Value'] > upper_bound[df[by_label]].values))]
+
+    return filtered_df
+
+
 def plot_boxplot_predictions_vs_labels(predictions, labels, ids, by_label):
     """
     Plot box plots of predictions and true labels, grouped by a specified label.
@@ -118,6 +147,8 @@ def plot_boxplot_predictions_vs_labels(predictions, labels, ids, by_label):
     df_labels = pd.DataFrame({by_label: ids, "Value": labels, "Type": "Label"})
 
     df_combined = pd.concat([df_predictions, df_labels])
+    df_combined = filter_outliers(df_combined, by_label)
+
 
     plt.figure(figsize=(12, 8))
     sns.boxplot(
