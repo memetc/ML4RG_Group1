@@ -29,14 +29,16 @@ def preprocess_data(df: pd.DataFrame,
                     stress_conditions: set,
                     upstream200_one_hot: bool = False,
                     species_one_hot: bool = False,
-                    conditions_one_hot: bool = False) -> pd.DataFrame:
+                    conditions_one_hot: bool = False,
+                    kmer_flag: bool = False) -> pd.DataFrame:
     print("Preprocessing started")
     # drop rows with missing upstream200 sequences
     df = df.dropna(subset=["upstream200"])
     df.reset_index(drop=True, inplace=True)
 
-    # Add K-mers for k: 3
-    df = get_kmer_dataframe(df)
+    if kmer_flag:
+        # Add K-mers for k: 3
+        df = get_kmer_dataframe(df)
 
     # drop rows with upstream200 sequences that contain anything but A, T, C, G
     df = df[
