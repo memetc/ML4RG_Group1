@@ -1,8 +1,8 @@
 import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
 import pandas as pd
-
+from sklearn.metrics import r2_score
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # plot the losses
 def plot_losses(train_losses, val_losses):
@@ -281,3 +281,60 @@ def plot_histogram(
         plt.savefig(f"{title}.png")
 
     plt.show()
+
+
+def plot_r2_scores_by_subgroup(X_test, y_test, xgb_model, subgroup_i, subgroup_mapping, subgroup_name):
+    """
+    Calculate and plot R-squared scores by subgroups.
+
+    Parameters:
+    - X_test (array-like or DataFrame): Test features.
+    - y_test (array-like or Series): True test labels.
+    - xgb_model (fitted model): Trained XGBoost model.
+    - subgroup_mapping (dict): Dictionary mapping subgroup IDs to descriptive names.
+
+    Returns:
+    - None
+    """
+
+    # Convert to pandas DataFrame for easier manipulation if not already
+    if isinstance(X_test, np.ndarray):
+        X_test = pd.DataFrame(X_test)
+    if isinstance(y_test, np.ndarray):
+        y_test = pd.Series(y_test)
+
+    # The subgroup identifiers
+    subgroup_ids = X_test.iloc[:, subgroup_i]  # Assuming the first column contains subgroup IDs
+
+    # Make predictions
+    test_predictions = xgb_model.predict(X_test)
+
+    # Create a DataFrame with predictions, true values, and subgroup IDs
+    results_df = pd.DataFrame({
+        'subgroup': subgroup_ids,
+        'true': y_test,
+        'predicted': test_predictions
+    })
+
+    # Calculate R-squared for each subgroup
+    subgroup_r2_scores = results_df.groupby('subgroup').apply(lambda df: r2_score(df['true'], df['predicted']))
+
+    # Convert the results to a DataFrame for easier plotting
+    subgroup_r2_scores_df = pd.DataFrame(subgroup_r2_scores, columns=['R-squared']).reset_index()
+
+    # Map the subgroup IDs to descriptive names using the mapping dictionary
+    subgroup_r2_scores_df['subgroup'] = subgroup_r2_scores_df['subgroup'].map(subgroup_mapping)
+
+    # Plot the R-squared scores for each subgroup
+    plt.figure(figsize=(10, 6))
+    sns.barplot(x='subgroup', y='R-squared', data=subgroup_r2_scores_df, palette='viridis')
+    plt.xlabel(subgroup_name)
+    plt.ylabel('R-squared')
+    plt.title(f'R-squared Scores by {subgroup_name}')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+
+# Example usage
+# Assuming X_test_tabular, y_test, xgb_model, and subgroup_mapping are already defined
+# plot_r2_scores_by_subgroup(X_test_tabular, y_test, xgb_model, subgroup_mapping)
