@@ -335,6 +335,38 @@ def plot_r2_scores_by_subgroup(X_test, y_test, xgb_model, subgroup_i, subgroup_m
     plt.tight_layout()
     plt.show()
 
-# Example usage
-# Assuming X_test_tabular, y_test, xgb_model, and subgroup_mapping are already defined
-# plot_r2_scores_by_subgroup(X_test_tabular, y_test, xgb_model, subgroup_mapping)
+def plot_feature_importance(xgb_model, importance_type='weight'):
+    """
+    Plot the feature importance of an XGBoost model.
+
+    Parameters:
+    - xgb_model (xgb.Booster or xgb.XGBModel): Trained XGBoost model.
+    - importance_type (str): Importance type to plot. Options: 'weight', 'gain', 'cover'. Default is 'weight'.
+
+    Returns:
+    - None
+    """
+
+    # Get the feature importance score
+    if isinstance(xgb_model, xgb.XGBModel):
+        booster = xgb_model.get_booster()
+    elif isinstance(xgb_model, xgb.Booster):
+        booster = xgb_model
+    else:
+        raise ValueError("Unsupported model type")
+
+    feature_importance = booster.get_score(importance_type=importance_type)
+
+    # Convert to a DataFrame for easier plotting
+    importance_df = pd.DataFrame(feature_importance.items(), columns=['Feature', 'Importance'])
+    importance_df = importance_df.sort_values(by='Importance', ascending=False)
+
+    # Plot the feature importance
+    plt.figure(figsize=(10, 6))
+    plt.barh(importance_df['Feature'], importance_df['Importance'], color='skyblue')
+    plt.xlabel('Importance')
+    plt.ylabel('Feature')
+    plt.title(f'Feature Importance ({importance_type})')
+    plt.gca().invert_yaxis()  # Invert y-axis to have the most important feature at the top
+    plt.show()
+
