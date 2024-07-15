@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -205,8 +207,7 @@ def plot_density_predictions_vs_labels(
 
 
 def plot_hexbin_predictions_vs_labels(
-    predictions, labels, title="Predictions vs Labels", gridsize=10, mincnt=5
-):
+    predictions, labels, title="Predictions vs Labels", gridsize=10, mincnt=5, path: str = None):
     """
     Plot a hexbin plot of predictions vs. true labels with inverse normalization.
 
@@ -230,9 +231,9 @@ def plot_hexbin_predictions_vs_labels(
         predictions,
         labels,
         gridsize=gridsize,
-        cmap="Blues",
+        cmap="RdYlGn",
         mincnt=mincnt,
-        extent=[labels.min(), labels.max(), labels.min(), labels.max()],
+        extent=[predictions.min(), predictions.max(), labels.min(), labels.max()],
     )
 
     # Add a color bar
@@ -240,12 +241,18 @@ def plot_hexbin_predictions_vs_labels(
     cb.set_label("Counts")
 
     # Plot the identity line (ideal predictions)
-    plt.plot([labels.min(), labels.max()], [labels.min(), labels.max()], "r--", lw=2)
+    plt.plot([labels.min(), labels.max()], [labels.min(), labels.max()], "w--", lw=2, alpha=0.7)
 
     plt.xlabel("Predictions")
     plt.ylabel("True Labels")
+    # min_value = min(predictions.min(), labels.min())
+    # max_value = max(predictions.max(), labels.max())
+    plt.xlim(predictions.min(), predictions.max())
+    plt.ylim(labels.min(), labels.max())
     plt.title(title)
     plt.grid(True)
+    if path:
+        plt.savefig(path, dpi=300)
     plt.show()
 
 

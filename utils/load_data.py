@@ -5,7 +5,6 @@ from typing import List, Dict
 from utils.helpers import species_abb_to_name, stress_columns, species_name_to_abb
 
 
-
 def standardize_columns(df: pd.DataFrame) -> pd.DataFrame:
     """
     Clean and format column name by replacing spaces and special characters with underscores and converting to lowercase.
@@ -18,8 +17,12 @@ def standardize_columns(df: pd.DataFrame) -> pd.DataFrame:
     """
     # Create a mapping dictionary from stress columns
     prefixes = list(species_abb_to_name.keys())
-    pattern = re.compile(r'(' + '|'.join(prefixes) + r')_(\w+ \(\w+\) - TPM)')
-    mapping = {f"{prefix}_{col.split()[0]}": col for col in stress_columns for prefix in prefixes}
+    pattern = re.compile(r"(" + "|".join(prefixes) + r")_(\w+ \(\w+\) - TPM)")
+    mapping = {
+        f"{prefix}_{col.split()[0]}": col
+        for col in stress_columns
+        for prefix in prefixes
+    }
 
     new_columns = []
     for col in df.columns:
@@ -35,11 +38,12 @@ def standardize_columns(df: pd.DataFrame) -> pd.DataFrame:
 
     df.columns = new_columns
 
-    if 'Aggregatibacter actinomycetemcomitans D7S-1' in set(df['Species']):
-        df['species_id'] = "AGGA"
+    if "Aggregatibacter actinomycetemcomitans D7S-1" in set(df["Species"]):
+        df["species_id"] = "AGGA"
     else:
-        df['species_id'] = df['Species'].map(species_name_to_abb)
+        df["species_id"] = df["Species"].map(species_name_to_abb)
     return df
+
 
 def clean_column_name(col_name: str) -> str:
     """
@@ -140,7 +144,7 @@ def get_upstream_data(file_path: str) -> pd.DataFrame:
     if file_path.endswith(".xlsx"):
         upstream_df: pd.DataFrame = pd.read_excel(file_path)
     elif file_path.endswith(".tsv"):
-        upstream_df: pd.DataFrame =  pd.read_csv(file_path, sep='\t')
+        upstream_df: pd.DataFrame = pd.read_csv(file_path, sep="\t")
     upstream_df.rename(columns={"contig": "chromosome"}, inplace=True)
     replacement_dict: Dict[str, str] = {
         "Staphylococcus��aureus MRSA252.csv": "Staphylococcus\xa0aureus MRSA252.csv",

@@ -1,19 +1,23 @@
 import pandas as pd
 import os
 
-from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.model_selection import train_test_split
 from utils.helpers import SequenceDataset
-from utils.normalizations import get_ctrl_norm, get_mean, get_log_norm
+from utils.normalizations import get_ctrl_norm, get_mean
 
 from collections import Counter
+from typing import Optional
+from utils.helpers import species_name_to_abb
+
 
 def generate_kmers(sequence, k=3):
     if isinstance(sequence, str):
-        kmers = [sequence[i:i+k] for i in range(len(sequence) - k + 1)]
+        kmers = [sequence[i : i + k] for i in range(len(sequence) - k + 1)]
         return kmers
     else:
         return []
+
+
 def get_kmer_dataframe(df, k=3):
     kmer_counts = {}
 
@@ -25,7 +29,38 @@ def get_kmer_dataframe(df, k=3):
     return pd.concat([df, kmer_df], axis=1)
 
 
-def preprocess_data(df: pd.DataFrame, stress_conditions: set) -> pd.DataFrame:
+def one_hot_encode_to_numpy(
+    df: pd.DataFrame, column_name: str, new_column_name: Optional[str] = None
+) -> pd.DataFrame:
+    """
+    One-hot encodes the specified column of the DataFrame and adds the encoded vectors as numpy arrays in a new column.
+
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column_name (str): The name of the column to be one-hot encoded.
+    new_column_name (Optional[str]): The name of the new column to store the one-hot encoded vectors. If None, defaults to '{column_name}_encoded'.
+
+    Returns:
+    pd.DataFrame: The DataFrame with an added column containing the one-hot encoded vectors as numpy arrays.
+    """
+    # One-hot encode the specified column
+    encoded_df = pd.get_dummies(df[column_name], prefix=column_name)
+
+    # Convert the one-hot encoded DataFrame to a numpy array
+    encoded_np = encoded_df.to_numpy(dtype=int)
+
+    # Assign the numpy arrays back to the DataFrame in a new column
+    if new_column_name is None:
+        new_column_name = column_name + "_encoded"
+
+    df[new_column_name] = list(encoded_np)
+
+    return df
+
+
+def preprocess_data(
+    df: pd.DataFrame, stress_conditions: set, normalize_by_ctrl: bool = True
+) -> pd.DataFrame:
     print("Preprocessing started")
     # drop rows with missing upstream200 sequences
     df = df.dropna(subset=["upstream200"])
@@ -35,21 +70,14 @@ def preprocess_data(df: pd.DataFrame, stress_conditions: set) -> pd.DataFrame:
     df = get_kmer_dataframe(df)
 
     # drop rows with upstream200 sequences that contain anything but A, T, C, G
-    df = df[
-        df["upstream200"].apply(
-            lambda x: set(x).issubset({"A", "T", "C", "G"})
-        )
-    ]
+    df = df[df["upstream200"].apply(lambda x: set(x).issubset({"A", "T", "C", "G"}))]
 
-    mlb = MultiLabelBinarizer()
-    # map each species id to a one hot encoding
-    df["species_id"] = df["species_id"].apply(lambda x: [x])
-    df["species"] = mlb.fit_transform(df["species_id"]).tolist()
+    df = one_hot_encode_to_numpy(df, "species", new_column_name="species_id")
 
     # Drop the columns that are not needed
     df = df.drop(
         columns=[name for name in df.columns if "tpm" in name]
-                + ["chromosome", "region", "csv", "species_id"]
+        + ["chromosome", "region", "csv"]
     )
 
     # map each base to one hot encoding
@@ -63,42 +91,64 @@ def preprocess_data(df: pd.DataFrame, stress_conditions: set) -> pd.DataFrame:
     longest_sequence = max(df["upstream200"].apply(lambda x: len(x)))
     df["upstream200"] = df["upstream200"].apply(
         lambda x: [base_encodings[base] for base in x]
-                  + [[0, 0, 0, 0]] * (longest_sequence - len(x))
+        + [[0, 0, 0, 0]] * (longest_sequence - len(x))
     )
 
-    # explode dataset to have one row per stress condition
-    df["stress"] = df.apply(
-        lambda row: [{stress: row[stress]} for stress in stress_conditions], axis=1
-    )
-    df = df.drop(
-        columns=[name for name in df.columns if name in stress_conditions]
-    )
+    if normalize_by_ctrl:
+        explode_fn = lambda row: [
+            {stress: row[stress], "is_normalized": False}
+            for stress in stress_conditions
+        ] + [
+            {stress: row[f"{stress}_normalized"], "is_normalized": True}
+            for stress in stress_conditions
+        ]
+    else:
+        explode_fn = lambda row: [
+            {stress: row[stress], "is_normalized": False}
+            for stress in stress_conditions
+        ]
 
+    # Explode dataset to have one row per stress condition
+    df["stress"] = df.apply(explode_fn, axis=1)
+
+    dropped_columns = [col for col in stress_conditions]
+    if normalize_by_ctrl:
+        dropped_columns += [f"{stress}_normalized" for stress in stress_conditions]
+
+    df = df.drop(columns=dropped_columns)
     df = df.explode("stress")
+
     df["stress_name"] = df["stress"].apply(
-        lambda x: list(x.keys())[0]
+        lambda x: (
+            list(x.keys())[0]
+            if not x["is_normalized"]
+            else list(x.keys())[0].replace("_normalized", "")
+        )
     )
-    df["stress"] = df["stress"].apply(lambda x: list(x.values())[0])
+    df["is_normalized"] = df["stress"].apply(lambda x: x["is_normalized"])
+    df["stress"] = df["stress"].apply(lambda x: x[list(x.keys())[0]])
 
-    # one hot encode stress names
-    df["stress_name"] = df["stress_name"].apply(lambda x: [x])
-    df["stress_name"] = mlb.fit_transform(df["stress_name"]).tolist()
+    df = one_hot_encode_to_numpy(df, "stress_name", new_column_name="stress_id")
 
-    # drop rows with 0 stress
-    df = df[df["stress"] > 0]
+    # Drop nans with stress
+    df = df.dropna(subset=["stress"])
     df.reset_index(drop=True, inplace=True)
+
     return df
 
 
 # Load the data
-def get_processed_data(project_root_dir: str = None,
-                       normalize_by_ctrl: bool = True,
-                       normalize_by_log: bool = True) -> pd.DataFrame:
+def get_processed_data(
+    project_root_dir: str = None,
+    normalize_by_ctrl: bool = True,
+    normalize_by_log: bool = True,
+) -> pd.DataFrame:
     """
     Load and preprocess the data for further analysis or model training.
 
     Parameters:
-    - data_df (pd.DataFrame, optional): A DataFrame to load and preprocess. If not provided, the function reads from 'combined_data.csv'.
+    - data_df (pd.DataFrame, optional): A DataFrame to load and preprocess. 
+    If not provided, the function reads from 'combined_data.csv'.
 
     Returns:
     - pd.DataFrame: The preprocessed DataFrame ready for analysis or model training.
@@ -112,7 +162,9 @@ def get_processed_data(project_root_dir: str = None,
     else:
         print("The file does not exist.")
         return
+
     averages_df = data_df.copy()
+    averages_df["species"] = averages_df["species"].map(species_name_to_abb)
     stress_conditions = set(
         [name.split("_")[0] for name in data_df.columns if "tpm" in name]
     )
@@ -125,31 +177,39 @@ def get_processed_data(project_root_dir: str = None,
 
     for stress in stress_conditions:
         stress_columns = [name for name in data_df.columns if stress + "_" in name]
+
         if normalize_by_ctrl:
             if stress == control_condition:
                 continue
-            averages_df[f"{stress}"] = get_ctrl_norm(data_df=data_df,
-                                                     stress_columns=stress_columns,
-                                                     control_columns=control_columns)
-
+            averages_df[[f"{stress}_normalized", f"{stress}"]] = get_ctrl_norm(
+                data_df=data_df,
+                stress_columns=stress_columns,
+                control_columns=control_columns,
+            )
         else:
-            averages_df[f"{stress}"] = get_mean(data_df=data_df,
-                                                stress_columns=stress_columns)
+            averages_df[f"{stress}"] = get_mean(
+                data_df=data_df, stress_columns=stress_columns
+            )
 
-    averages_df = preprocess_data(df=averages_df,
-                                  stress_conditions=stress_conditions)
+    averages_df = preprocess_data(
+        df=averages_df,
+        stress_conditions=stress_conditions,
+        normalize_by_ctrl=normalize_by_ctrl,
+    )
 
-    if normalize_by_log:
-        averages_df["stress"] = get_log_norm(df=averages_df, normalize_by_ctrl=normalize_by_ctrl)
+    # if normalize_by_log:
+    #     averages_df = get_log_norm(
+    #         df=averages_df, normalize_by_ctrl=normalize_by_ctrl
+    #     )
+    
+    float_columns = averages_df.select_dtypes(include=['float64', 'float32']).columns
+    averages_df = averages_df.drop(columns=[col for col in float_columns if averages_df[col].sum() == 0])
+    averages_df.reset_index(drop=True, inplace=True)
 
-    averages_df = averages_df
     return averages_df
 
 
-def prepare_datasets(data_df,
-                     species_id=-1,
-                     size=-1,
-                     test_split=0.1):
+def prepare_datasets(data_df, species_id=-1, size=-1, test_split=0.1):
     """
     Load and preprocess data, and split it into training and testing datasets.
 
@@ -186,16 +246,17 @@ def prepare_datasets(data_df,
 
 def transform_dataframe(df, drop_upstream=True):
     # Convert one-hot encoded lists to numeric values for species
-    df['species'] = df['species'].apply(lambda x: x.index(1) if 1 in x else -1)
+    df["species"] = df["species"].apply(lambda x: x.index(1) if 1 in x else -1)
 
     # Convert one-hot encoded lists to numeric values for stress_name
-    df['stress_name'] = df['stress_name'].apply(lambda x: x.index(1) if 1 in x else -1)
+    df["stress_name"] = df["stress_name"].apply(lambda x: x.index(1) if 1 in x else -1)
 
     # Drop the upstream200 column
     if drop_upstream:
-        df = df.drop(columns=['upstream200'])
+        df = df.drop(columns=["upstream200"])
 
     return df
+
 
 def main():
     processed_data_path = f"{os.getcwd()}/data/processed_data_kmer_fat.pkl"
