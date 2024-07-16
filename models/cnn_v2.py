@@ -22,12 +22,13 @@ class CNNV2(nn.Module):
         hidden_size = kwargs["hidden_size"] if "hidden_size" in kwargs else 30
         cnn_filters = kwargs["cnn_filters"] if "cnn_filters" in kwargs else hidden_size
         kernel_size = kwargs["kernel_size"] if "kernel_size" in kwargs else 4
+        stride = kwargs["stride"] if "stride" in kwargs else 3
 
         # activation functions
         self.activation = kwargs["activation"] if "activation" in kwargs else nn.ReLU()
 
         # Input layers
-        self.input_base = nn.Conv2d(1, cnn_filters, kernel_size=(kernel_size, 4))
+        self.input_base = nn.Conv2d(1, cnn_filters, kernel_size=(kernel_size, 4), stride=stride)
         self.bn_base = nn.BatchNorm2d(cnn_filters)  # Batch normalization for conv layer
 
         self.input_species = nn.Linear(species_size, hidden_size)
