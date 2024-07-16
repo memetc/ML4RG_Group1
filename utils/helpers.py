@@ -141,7 +141,7 @@ class SequenceDataset(Dataset):
 
     def __getitem__(self, idx):
         return (
-            torch.tensor(self.X.iloc[idx]["species"]).float(),
-            torch.tensor(self.X.iloc[idx]["stress_name"]).float(),
-            torch.tensor(self.X.iloc[idx]["upstream200"]).float().view(1, -1, 4),
+            torch.tensor(self.X.iloc[idx]["species_1h"]).float(),
+            torch.tensor(self.X.iloc[idx]["stress_name_1h"]).float(),
+            torch.tensor(self.X.iloc[idx]["upstream200_1h"]).float().view(1, -1, 4),
         ), torch.tensor(self.y.iloc[idx]).float()
