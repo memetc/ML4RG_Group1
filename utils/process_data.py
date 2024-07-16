@@ -24,6 +24,8 @@ def get_kmer_dataframe(df, k=3):
     kmer_df = pd.DataFrame(kmer_counts).fillna(0).T
     return pd.concat([df, kmer_df], axis=1)
 
+def convert_to_one_hot(pd_series, mlb):
+    return mlb.fit_transform(pd_series.apply(lambda x: [x])).tolist()
 
 def preprocess_data(df: pd.DataFrame,
                     stress_conditions: set,
@@ -50,8 +52,7 @@ def preprocess_data(df: pd.DataFrame,
 
     if species_one_hot:
         # map each species id to a one hot encoding
-        df["species_id"] = df["species_id"].apply(lambda x: [x])
-        df["species"] = mlb.fit_transform(df["species_id"]).tolist()
+        df["species_1h"] = convert_to_one_hot(df["species_id"], mlb)
 
     # Drop the columns that are not needed
     df = df.drop(
@@ -70,7 +71,7 @@ def preprocess_data(df: pd.DataFrame,
         }
 
         longest_sequence = max(df["upstream200"].apply(lambda x: len(x)))
-        df["upstream200"] = df["upstream200"].apply(
+        df["upstream200_1h"] = df["upstream200"].apply(
             lambda x: [base_encodings[base] for base in x]
                       + [[0, 0, 0, 0]] * (longest_sequence - len(x))
         )
@@ -91,8 +92,7 @@ def preprocess_data(df: pd.DataFrame,
 
     if conditions_one_hot:
         # one hot encode stress names
-        df["stress_name"] = df["stress_name"].apply(lambda x: [x])
-        df["stress_name"] = mlb.fit_transform(df["stress_name"]).tolist()
+        df["stress_name_1h"] = convert_to_one_hot(df["stress_name"], mlb)
 
     # drop rows with 0 stress
     df = df[df["tpm"] > 0]
@@ -189,8 +189,8 @@ def prepare_datasets(data_df,
 
     # split the data into training and testing
     X_train, X_test, y_train, y_test = train_test_split(
-        data_df[["species", "stress_name", "upstream200"]],
-        data_df["stress"],
+        data_df[["species_1h", "stress_name_1h", "upstream200_1h"]],
+        data_df["tpm"],
         test_size=test_split,
     )
 
@@ -235,10 +235,21 @@ def transform_str_to_numeric(df):
 
     return df, mappings
 
+def create_mapping_from_one_hot(df, one_hot_column, other_column):
+    mapping = {}
+    unique_rows = df.drop_duplicates(subset=[other_column])
+    for _, row in unique_rows.iterrows():
+        one_hot_vector = row[one_hot_column]
+        index = one_hot_vector.index(1)
+        other_value = row[other_column]
+        mapping[index] = other_value
+    return mapping
 
 def main():
-    processed_data_path = f"{os.getcwd()}/data/processed_data_upstream1h.pkl"
-    processed_df = get_processed_data(upstream200_one_hot=True)
+    processed_data_path = f"{os.getcwd()}/data/processed_data_1h.pkl"
+    processed_df = get_processed_data(upstream200_one_hot=True,
+                                      conditions_one_hot=True,
+                                      species_one_hot=True)
 
     # Save the merged data to a CSV file
     print(f"Data is being saved {processed_data_path}")
