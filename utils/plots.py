@@ -1,9 +1,10 @@
 import numpy as np
+import xgboost as xgb
 import pandas as pd
-from sklearn.metrics import r2_score
 import matplotlib.pyplot as plt
 import seaborn as sns
-import xgboost as xgb
+
+from sklearn.metrics import r2_score
 
 # plot the losses
 def plot_losses(train_losses, val_losses):
@@ -33,7 +34,7 @@ def plot_losses(train_losses, val_losses):
     plt.show()
 
 
-def plot_predictions_vs_labels(predictions, labels, title="Predictions vs Labels"):
+def plot_predictions_vs_labels(predictions, labels, title="Predictions vs Labels", filename=None):
     """
     Plot a scatter plot of predictions vs. true labels.
 
@@ -55,6 +56,8 @@ def plot_predictions_vs_labels(predictions, labels, title="Predictions vs Labels
     plt.ylabel("True Labels")
     plt.title(title)
     plt.grid(True)
+    if filename:
+        plt.savefig(filename)
     plt.show()
 
 
@@ -126,7 +129,7 @@ def filter_outliers(df, by_label):
     return filtered_df
 
 
-def plot_boxplot_predictions_vs_labels(predictions, labels, ids, by_label):
+def plot_boxplot_predictions_vs_labels(predictions, labels, ids, by_label, filename=None):
     """
     Plot box plots of predictions and true labels, grouped by a specified label.
 
@@ -150,6 +153,8 @@ def plot_boxplot_predictions_vs_labels(predictions, labels, ids, by_label):
     df_combined = pd.concat([df_predictions, df_labels])
     df_combined = filter_outliers(df_combined, by_label)
 
+    df_combined[by_label] = pd.Categorical(df_combined[by_label], categories=sorted(df_combined[by_label].unique()), ordered=True)
+
 
     plt.figure(figsize=(12, 8))
     sns.boxplot(
@@ -164,7 +169,10 @@ def plot_boxplot_predictions_vs_labels(predictions, labels, ids, by_label):
     plt.xlabel(by_label)
     plt.ylabel("Value")
     plt.legend(title="Type")
+    plt.xticks(rotation=45)
     plt.grid(True)
+    if filename:
+        plt.savefig(filename)
     plt.show()
 
 
@@ -206,7 +214,7 @@ def plot_density_predictions_vs_labels(
 
 
 def plot_hexbin_predictions_vs_labels(
-    predictions, labels, title="Predictions vs Labels", gridsize=10, mincnt=5
+    predictions, labels, title="Predictions vs Labels", gridsize=10, mincnt=5, filename=None
 ):
     """
     Plot a hexbin plot of predictions vs. true labels with inverse normalization.
@@ -247,6 +255,8 @@ def plot_hexbin_predictions_vs_labels(
     plt.ylabel("True Labels")
     plt.title(title)
     plt.grid(True)
+    if filename:
+        plt.savefig(filename)
     plt.show()
 
 
@@ -378,4 +388,79 @@ def plot_feature_importance(xgb_model, feature_names=None, importance_type='weig
     plt.yticks(rotation=45)  # Rotate the y-axis labels
     plt.gca().invert_yaxis()  # Invert y-axis to have the most important feature at the top
     plt.show()
+
+
+def calculate_r2_xg(xgb_model, X_tabular, y_test, species_col, condition_col):
+    # Predict using the provided XGBoost model
+    test_predictions = xgb_model.predict(X_tabular)
+    r2_results = []
+
+    # Create a dataframe with predictions and actual values
+    results_df = X_tabular.copy()
+    results_df['predicted'] = test_predictions
+    results_df['actual'] = y_test
+    results_df[species_col] = X_tabular[species_col].values
+    results_df[condition_col] = X_tabular[condition_col].values
+
+    species_conditions = results_df[[species_col, condition_col]].drop_duplicates()
+
+    for index, row in species_conditions.iterrows():
+        species = row[species_col]
+        condition = row[condition_col]
+
+        subset_df = results_df[(results_df[species_col] == species) & (results_df[condition_col] == condition)]
+
+        if len(subset_df) > 1:  # Need at least two samples to calculate R2
+            r2 = r2_score(subset_df['actual'], subset_df['predicted'])
+            r2_results.append([species, condition, r2])
+        else:
+            r2_results.append([species, condition, None])
+
+    r2_df = pd.DataFrame(r2_results, columns=[species_col, condition_col, 'R2'])
+    return r2_df.pivot(index=species_col, columns=condition_col, values='R2')
+
+
+def calculate_r2_cnn(predictions, labels, species_ids, stress_ids):
+    r2_results = []
+
+    # Create a dataframe with predictions and actual values
+    results_df = pd.DataFrame({
+        'predicted': predictions,
+        'actual': labels,
+        'species_id': species_ids,
+        'condition': stress_ids
+    })
+
+    species_conditions = results_df[['species_id', 'condition']].drop_duplicates()
+
+    for index, row in species_conditions.iterrows():
+        species = row['species_id']
+        condition = row['condition']
+
+        subset_df = results_df[(results_df['species_id'] == species) & (results_df['condition'] == condition)]
+
+        if len(subset_df) > 1:  # Need at least two samples to calculate R2
+            r2 = r2_score(subset_df['actual'], subset_df['predicted'])
+            r2_results.append([species, condition, r2])
+        else:
+            r2_results.append([species, condition, None])
+
+    r2_df = pd.DataFrame(r2_results, columns=['species_id', 'condition', 'R2'])
+    return r2_df.pivot(index='species_id', columns='condition', values='R2')
+
+def plot_r2_values(r2_df, species_mapping, condition_mapping, filename=None):
+    r2_df = r2_df.rename(index=species_mapping, columns=condition_mapping)
+
+    plt.figure(figsize=(10, 15))
+    sns.heatmap(r2_df, annot=True, cmap='Greens', linewidths=.5, linecolor='black', cbar_kws={'label': 'R2 Value'})
+    plt.title('R2 Values for Different Species and Conditions')
+    plt.xlabel('Condition')
+    plt.ylabel('Species')
+    if filename:
+        plt.savefig(filename)
+    plt.show()
+
+
+
+
 

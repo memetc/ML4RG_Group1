@@ -106,7 +106,8 @@ def get_processed_data(project_root_dir: str = None,
                        normalize_by_log: bool = True,
                        upstream200_one_hot: bool = False,
                        species_one_hot: bool = False,
-                       conditions_one_hot: bool = False
+                       conditions_one_hot: bool = False,
+                       kmer_flag: bool = False
                        ) -> pd.DataFrame:
     """
     Load and preprocess the data for further analysis or model training.
@@ -154,7 +155,8 @@ def get_processed_data(project_root_dir: str = None,
                                   stress_conditions=stress_conditions,
                                   upstream200_one_hot=upstream200_one_hot,
                                   species_one_hot=species_one_hot,
-                                  conditions_one_hot=conditions_one_hot)
+                                  conditions_one_hot=conditions_one_hot,
+                                  kmer_flag=kmer_flag)
 
     if normalize_by_log:
         averages_df["tpm"] = get_log_norm(df=averages_df, normalize_by_ctrl=normalize_by_ctrl)
@@ -246,10 +248,12 @@ def create_mapping_from_one_hot(df, one_hot_column, other_column):
     return mapping
 
 def main():
-    processed_data_path = f"{os.getcwd()}/data/processed_data_1h.pkl"
+    processed_data_path = f"{os.getcwd()}/data/processed_data_upstream1h_kmers.pkl"
     processed_df = get_processed_data(upstream200_one_hot=True,
-                                      conditions_one_hot=True,
-                                      species_one_hot=True)
+                                      conditions_one_hot=False,
+                                      species_one_hot=False,
+                                      kmer_flag=True
+                                      )
 
     # Save the merged data to a CSV file
     print(f"Data is being saved {processed_data_path}")
