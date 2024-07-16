@@ -3,6 +3,7 @@ import pandas as pd
 from sklearn.metrics import r2_score
 import matplotlib.pyplot as plt
 import seaborn as sns
+import xgboost as xgb
 
 # plot the losses
 def plot_losses(train_losses, val_losses):
@@ -335,7 +336,7 @@ def plot_r2_scores_by_subgroup(X_test, y_test, xgb_model, subgroup_i, subgroup_m
     plt.tight_layout()
     plt.show()
 
-def plot_feature_importance(xgb_model, importance_type='weight'):
+def plot_feature_importance(xgb_model, feature_names=None, importance_type='weight', top_n=None):
     """
     Plot the feature importance of an XGBoost model.
 
@@ -359,14 +360,22 @@ def plot_feature_importance(xgb_model, importance_type='weight'):
 
     # Convert to a DataFrame for easier plotting
     importance_df = pd.DataFrame(feature_importance.items(), columns=['Feature', 'Importance'])
+    # Replace feature indices with actual names
+
+    if feature_names:
+        importance_df['Feature'] = importance_df['Feature'].apply(lambda x: feature_names[int(x[1:])])
+
     importance_df = importance_df.sort_values(by='Importance', ascending=False)
 
-    # Plot the feature importance
+    if top_n is not None:
+        importance_df = importance_df.head(top_n)
+
     plt.figure(figsize=(10, 6))
     plt.barh(importance_df['Feature'], importance_df['Importance'], color='skyblue')
     plt.xlabel('Importance')
     plt.ylabel('Feature')
     plt.title(f'Feature Importance ({importance_type})')
+    plt.yticks(rotation=45)  # Rotate the y-axis labels
     plt.gca().invert_yaxis()  # Invert y-axis to have the most important feature at the top
     plt.show()
 
