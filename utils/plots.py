@@ -7,7 +7,7 @@ import pandas as pd
 
 
 # plot the losses
-def plot_losses(train_losses, val_losses):
+def plot_losses(train_losses, val_losses, path: str = None):
     """
     Plot training and validation losses over epochs.
 
@@ -31,10 +31,14 @@ def plot_losses(train_losses, val_losses):
     plt.plot(log_train_losses, label="Log Train Loss")
     plt.plot(log_val_losses, label="Log Validation Loss")
     plt.legend()
+    if path:
+        plt.savefig(path, dpi=300)
     plt.show()
 
 
-def plot_predictions_vs_labels(predictions, labels, title="Predictions vs Labels"):
+def plot_predictions_vs_labels(
+    predictions, labels, title="Predictions vs Labels", path: str = None
+):
     """
     Plot a scatter plot of predictions vs. true labels.
 
@@ -54,13 +58,24 @@ def plot_predictions_vs_labels(predictions, labels, title="Predictions vs Labels
     plt.plot([labels.min(), labels.max()], [labels.min(), labels.max()], "r--", lw=2)
     plt.xlabel("Predictions")
     plt.ylabel("True Labels")
+    plt.xlim(predictions.min(), predictions.max()
+    )
+    plt.ylim(labels.min(), labels.max())
+    # plt.xlim(labels.min(), labels.max())
+    # plt.ylim(labels.min(), labels.max())
     plt.title(title)
     plt.grid(True)
+    if path:
+        plt.savefig(path, dpi=300)
     plt.show()
 
 
 def plot_predictions_vs_labels_by_species(
-    predictions, labels, species_ids, title="Predictions vs Labels by Species"
+    predictions,
+    labels,
+    species_ids,
+    title="Predictions vs Labels by Species",
+    path: str = None,
 ):
     """
     Plot scatter plots of predictions vs. true labels, grouped by species.
@@ -95,6 +110,8 @@ def plot_predictions_vs_labels_by_species(
         plt.xlabel("Predictions")
         plt.title(f"{title} - Species ID: {species_id}")
         plt.grid(True)
+        if path:
+            plt.savefig(path, dpi=300)
         plt.show()
 
 
@@ -110,8 +127,8 @@ def filter_outliers(df, by_label):
     - DataFrame: The DataFrame with outliers removed.
     """
     # Calculate Q1 (25th percentile) and Q3 (75th percentile)
-    Q1 = df.groupby(by_label)['Value'].quantile(0.25)
-    Q3 = df.groupby(by_label)['Value'].quantile(0.75)
+    Q1 = df.groupby(by_label)["Value"].quantile(0.25)
+    Q3 = df.groupby(by_label)["Value"].quantile(0.75)
 
     # Calculate IQR
     IQR = Q3 - Q1
@@ -122,12 +139,18 @@ def filter_outliers(df, by_label):
 
     # Remove outliers
     filtered_df = df[
-        ~((df['Value'] < lower_bound[df[by_label]].values) | (df['Value'] > upper_bound[df[by_label]].values))]
+        ~(
+            (df["Value"] < lower_bound[df[by_label]].values)
+            | (df["Value"] > upper_bound[df[by_label]].values)
+        )
+    ]
 
     return filtered_df
 
 
-def plot_boxplot_predictions_vs_labels(predictions, labels, ids, by_label):
+def plot_boxplot_predictions_vs_labels(
+    predictions, labels, ids, by_label, path: str = None
+):
     """
     Plot box plots of predictions and true labels, grouped by a specified label.
 
@@ -151,7 +174,6 @@ def plot_boxplot_predictions_vs_labels(predictions, labels, ids, by_label):
     df_combined = pd.concat([df_predictions, df_labels])
     df_combined = filter_outliers(df_combined, by_label)
 
-
     plt.figure(figsize=(12, 8))
     sns.boxplot(
         x=by_label,
@@ -166,11 +188,13 @@ def plot_boxplot_predictions_vs_labels(predictions, labels, ids, by_label):
     plt.ylabel("Value")
     plt.legend(title="Type")
     plt.grid(True)
+    if path:
+        plt.savefig(path, dpi=300)
     plt.show()
 
 
 def plot_density_predictions_vs_labels(
-    predictions, labels, title="Predictions vs Labels"
+    predictions, labels, title="Predictions vs Labels", path: str = None
 ):
     """
     Plot a density plot of predictions vs. true labels with inverse normalization.
@@ -203,11 +227,19 @@ def plot_density_predictions_vs_labels(
     plt.ylabel("True Labels")
     plt.title(title)
     plt.grid(True)
+    if path:
+        plt.savefig(path, dpi=300)
     plt.show()
 
 
 def plot_hexbin_predictions_vs_labels(
-    predictions, labels, title="Predictions vs Labels", gridsize=10, mincnt=5, path: str = None):
+    predictions,
+    labels,
+    title="Predictions vs Labels",
+    gridsize=10,
+    mincnt=5,
+    path: str = None,
+):
     """
     Plot a hexbin plot of predictions vs. true labels with inverse normalization.
 
@@ -241,7 +273,13 @@ def plot_hexbin_predictions_vs_labels(
     cb.set_label("Counts")
 
     # Plot the identity line (ideal predictions)
-    plt.plot([labels.min(), labels.max()], [labels.min(), labels.max()], "w--", lw=2, alpha=0.7)
+    plt.plot(
+        [labels.min(), labels.max()],
+        [labels.min(), labels.max()],
+        "w--",
+        lw=2,
+        alpha=0.7,
+    )
 
     plt.xlabel("Predictions")
     plt.ylabel("True Labels")
@@ -262,7 +300,7 @@ def plot_histogram(
     xlabel="Value",
     ylabel="Frequency",
     bins=100,
-    save=True,
+    path: str = None,
 ):
     """
     Plots a histogram for a given Pandas Series.
@@ -284,7 +322,7 @@ def plot_histogram(
     plt.ylabel(ylabel)
     plt.grid(True)
 
-    if save:
-        plt.savefig(f"{title}.png")
+    if path:
+        plt.savefig(path, dpi=300)
 
     plt.show()
