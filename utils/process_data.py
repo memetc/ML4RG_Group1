@@ -28,6 +28,9 @@ def preprocess_data(df: pd.DataFrame, stress_conditions: set) -> pd.DataFrame:
     df["species_id"] = df["species_id"].apply(lambda x: [x])
     df["species"] = mlb.fit_transform(df["species_id"]).tolist()
 
+    species_ids_to_names = mlb.classes_
+    print(f"Stress ids to names: {species_ids_to_names}")
+
     # Drop the columns that are not needed
     df = df.drop(
         columns=[name for name in df.columns if "tpm" in name]
@@ -97,6 +100,9 @@ def preprocess_data(df: pd.DataFrame, stress_conditions: set) -> pd.DataFrame:
     
     df["stress_name"] = df["stress_name"].apply(lambda x: [x])
     df["stress_name"] = mlb.fit_transform(df["stress_name"]).tolist()
+
+    stress_ids_to_names = mlb.classes_
+    print(f"Stress ids to names: {stress_ids_to_names}")
 
     tqdm.pandas()
     df["stress_name"] = df.progress_apply(lambda row: mul_stress_by_kmercount(row), axis=1)

@@ -4,6 +4,8 @@ import torch.nn as nn
 import torch.optim as optim
 import random
 
+from tqdm import tqdm
+
 from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
@@ -217,7 +219,7 @@ def predict(config, net, test_dataset):
     all_stress_ids = []
     # Iterates over the test DataLoader to generate predictions
     with torch.no_grad():
-        for i, data in enumerate(test_loader, 0):
+        for i, data in tqdm(enumerate(test_loader, 0)):
             inputs, labels = data
             inputs = [i.to(device) for i in inputs]
             labels = labels.to(device)
